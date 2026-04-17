@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product Testing Roadmap — Gantt</title>
+<style>
+  :root {
+    --bg: #f8f9fa; --surface: #ffffff; --border: #e2e8f0;
+    --text: #1a202c; --text-muted: #718096; --text-light: #a0aec0;
+    --blue: #2E75B6; --blue-dark: #1F4E78; --blue-light: #D6E4F0;
+    --green: #006100; --green-bg: #C6EFCE;
+    --red: #9C0006; --red-bg: #FFC7CE;
+    --gold: #FFC000; --gold-dark: #BF8F00; --gold-bg: #FFF2CC;
+    --row-alt: #f7fafc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  .header { background: var(--blue-dark); color: white; padding: 20px 28px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+  .header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+  .header .generated { font-size: 11px; opacity: 0.6; }
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .controls label { font-size: 13px; font-weight: 500; opacity: 0.85; }
+  .controls select, .controls input { padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.12); color: white; font-size: 13px; outline: none; }
+  .controls select option { background: var(--blue-dark); color: white; }
+  .controls select:focus, .controls input:focus { border-color: rgba(255,255,255,0.6); }
+  .legend { display: flex; gap: 16px; padding: 10px 28px; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 12px; align-items: center; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+  .stats { display: flex; gap: 20px; padding: 8px 28px; background: var(--blue-light); font-size: 12px; color: var(--blue-dark); font-weight: 500; }
+  .gantt-wrapper { display: flex; overflow: hidden; border-top: 1px solid var(--border); }
+  .left-panel { flex-shrink: 0; overflow-y: auto; border-right: 2px solid var(--border); background: var(--surface); }
+  .left-panel::-webkit-scrollbar { display: none; }
+  .left-header { display: grid; grid-template-columns: 140px 1fr 70px 60px; position: sticky; top: 0; z-index: 10; }
+  .left-header > div { padding: 8px 8px; font-size: 11px; font-weight: 600; color: white; background: var(--blue-dark); border-bottom: 1px solid var(--border); border-right: 1px solid rgba(255,255,255,0.1); white-space: nowrap; }
+  .left-row { display: grid; grid-template-columns: 140px 1fr 70px 60px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+  .left-row:hover { background: var(--blue-light) !important; }
+  .left-row > div { padding: 5px 8px; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-right: 1px solid var(--border); display: flex; align-items: center; }
+  .left-row .gnarr-pos { color: var(--green); font-weight: 600; }
+  .left-row .gnarr-neg { color: var(--red); font-weight: 600; }
+  .left-row .winner-challenger { color: var(--green); background: var(--green-bg); font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; }
+  .left-row .winner-control { color: var(--red); background: var(--red-bg); font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; }
+  .left-row .winner-rollout { color: var(--blue-dark); background: var(--blue-light); font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; }
+  .left-row .status-running { color: var(--gold-dark); background: var(--gold-bg); font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; }
+  .right-panel { flex: 1; overflow-x: auto; overflow-y: auto; }
+  .right-panel::-webkit-scrollbar { height: 10px; }
+  .right-panel::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 5px; }
+  .timeline-header { position: sticky; top: 0; z-index: 9; }
+  .fq-row { display: flex; }
+  .fq-label { font-size: 11px; font-weight: 700; color: white; display: flex; align-items: center; justify-content: center; border-right: 2px solid rgba(255,255,255,0.3); }
+  .week-row { display: flex; }
+  .week-cell { font-size: 8px; color: rgba(255,255,255,0.8); text-align: center; padding: 2px 0; border-right: 1px solid rgba(255,255,255,0.15); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.2; }
+  .week-cell .wk-num { font-weight: 700; font-size: 9px; color: white; }
+  .bar-row { display: flex; border-bottom: 1px solid var(--border); position: relative; }
+  .bar-cell { position: relative; border-right: 1px solid #f0f0f0; }
+  .bar-cell.qtr-start { border-left: 1.5px solid var(--blue-dark); }
+  .bar-fill { position: absolute; top: 3px; bottom: 3px; left: 0; right: 0; border-radius: 3px; }
+  .bar-fill.complete { background: var(--blue); }
+  .bar-fill.running { background: var(--gold); background: repeating-linear-gradient(45deg, var(--gold), var(--gold) 4px, #ffdb4d 4px, #ffdb4d 8px); }
+  .tooltip { position: fixed; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); pointer-events: none; z-index: 100; max-width: 380px; display: none; }
+  .tooltip .tt-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; color: var(--blue-dark); }
+  .tooltip .tt-row { display: flex; justify-content: space-between; gap: 16px; padding: 2px 0; }
+  .tooltip .tt-label { color: var(--text-muted); }
+  .tooltip .tt-value { font-weight: 600; }
+  .tooltip hr { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+  .zoom-control { display: flex; align-items: center; gap: 6px; }
+  .zoom-control input[type=range] { width: 100px; accent-color: white; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 17, 2026 at 10:19 AM</div></div>
+  <div class="controls">
+    <label>Quarter</label>
+    <select id="fqFilter"><option value="All">All Quarters</option></select>
+    <label>Product</label>
+    <select id="productFilter"><option value="All">All Products</option></select>
+    <label>Status</label>
+    <select id="statusFilter"><option value="All">All</option><option value="Complete">Complete</option><option value="Running">Running</option></select>
+    <div class="zoom-control"><label>Zoom</label><input type="range" id="zoomSlider" min="10" max="50" value="22"></div>
+    <label>Search</label>
+    <input type="text" id="searchInput" placeholder="Test name..." style="width:150px;">
+  </div>
+</div>
+<div class="legend">
+  <span style="font-weight:600;">Legend:</span>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--blue);"></div> Complete</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:repeating-linear-gradient(45deg,var(--gold),var(--gold) 3px,#ffdb4d 3px,#ffdb4d 6px);"></div> Running</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--green-bg);border:1px solid var(--green);"></div> Challenger Win</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--red-bg);border:1px solid var(--red);"></div> Control Win</div>
+</div>
+<div class="stats" id="statsBar"></div>
+<div class="gantt-wrapper" id="ganttWrapper">
+  <div class="left-panel" id="leftPanel"></div>
+  <div class="right-panel" id="rightPanel"></div>
+</div>
+<div class="tooltip" id="tooltip"></div>
+<script>
+const RAW_DATA = {"tests": [{"product": "Acrobat Reader", "name": "RGS0241 - Edit Scans Bezel - Reader - Contextual Bezel - WW", "start": "2023-08-03", "end": "2023-09-01", "fq": "FY23 Q3", "gnarr": 0.04, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0263 - Organize Pages Subtools In Thumbnails Panel - Reader - Multi - WW", "start": "2023-09-07", "end": "2023-10-06", "fq": "FY23 Q4", "gnarr": 0.03, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0276 - MV - RCM Format Options - Reader - RCM - WW", "start": "2023-10-09", "end": "2023-11-03", "fq": "FY23 Q4", "gnarr": 0.04, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0273 - Home LHP Banner - Reader - Modal - EN", "start": "2023-10-16", "end": "2023-11-29", "fq": "FY23 Q4", "gnarr": 0.03, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0264 - Set preference - Reader - Settings - WW - EN, ES, DE, JP, PT, KR, FR", "start": "2023-10-30", "end": "2023-12-06", "fq": "FY23 Q4", "gnarr": null, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0282 - Subtools Specific Modals - Reader - Multi - WW - EN, ES, DE, JP, PT, KR, FR", "start": "2023-12-13", "end": "2024-01-15", "fq": "FY24 Q1", "gnarr": 0.09, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0296 - Combine Files Open File Dialog - Reader - Open File - WW - EN, ES, DE, JP, PT, KR, FR", "start": "2024-01-15", "end": "2024-02-26", "fq": "FY24 Q1", "gnarr": 0.02, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0285 - Rotating Upsell Modal cards - Reader - Multi - WW - EN, ES, DE, JP, PT, KR, FR", "start": "2024-01-26", "end": "2024-02-26", "fq": "FY24 Q1", "gnarr": -0.03, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0313 - Edit Panel Simplification - Reader - Multi - WW - EN, ES, DE, JP, PT, KR, FR", "start": "2024-02-26", "end": "2024-04-17", "fq": "FY24 Q1", "gnarr": -0.01, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0281 - Waffle Menu - Reader - Multi - WW - EN, ES, DE, JP, PT, KR, FR", "start": "2024-03-11", "end": "2024-06-11", "fq": "FY24 Q2", "gnarr": null, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0329 - RCM for Edit and Convert Megaverb - Reader - Multi - WW - EN, ES, DE, JP, PT, KR, FR", "start": "2024-05-07", "end": "2024-06-07", "fq": "FY24 Q2", "gnarr": 0.01, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0331 - Unified Share - Reader - Mutli - WW - EN", "start": "2024-05-07", "end": "2024-06-07", "fq": "FY24 Q2", "gnarr": -0.04, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reduced Mode", "name": "RGS0339 - Bonus Launch Suppression - Reduced Mode - Bonus Launch - US - EN", "start": "2024-06-24", "end": "2024-07-15", "fq": "FY24 Q3", "gnarr": null, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0344 - Edit Bounding Box - Reader - Multi - WW - EN, ES, DE, JP, PT, KR, FR", "start": "2024-07-02", "end": "2024-07-23", "fq": "FY24 Q3", "gnarr": 0.08, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0346 - AAA Propensity Model - Reader - Multi - WW - EN", "start": "2024-07-28", "end": "2024-09-30", "fq": "FY24 Q3", "gnarr": null, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0343 - IAP through GEN AI Touchpoints - Reader - Multi - WW - EN", "start": "2024-07-30", "end": "2024-08-20", "fq": "FY24 Q3", "gnarr": 0.01, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0347 - Drag & Drop - Combine - Reader - Multi - WW - DE, FR, JP, ES, PT, KR", "start": "2024-07-31", "end": "2024-08-31", "fq": "FY24 Q3", "gnarr": 0.08, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0356 - Gen AI Anonymous - Reader - Multi - DE,FR", "start": "2024-10-03", "end": "2024-10-31", "fq": "FY24 Q4", "gnarr": 0.02, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0357 - Gen AI Anonymous - Reader - Multi - EN", "start": "2024-10-03", "end": "2024-10-31", "fq": "FY24 Q4", "gnarr": 0.06, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0354 - Create PDF Maker - Reader - Multi - EN, DE, JP, FR, ES, PT, KR", "start": "2024-10-14", "end": "2024-11-15", "fq": "FY24 Q4", "gnarr": 0.08, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0364 - Gen AI FAB - Reader - Multi - WW - EN, FR, DE", "start": "2024-11-12", "end": "2024-12-13", "fq": "FY24 Q4", "gnarr": 0, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0362 - Spell Check V2 - Reader - Multi - WW - EN, ES, DE, JP, PT, KR, FR", "start": "2024-11-12", "end": "2024-12-13", "fq": "FY24 Q4", "gnarr": 0.01, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0363 - Free/Paid Launch Card - Reader - Multi - WW - EN", "start": "2024-11-12", "end": "2024-12-13", "fq": "FY24 Q4", "gnarr": 0.11, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reduced Mode", "name": "RGS0369 - Spell Check V2 - Reduced Mode - Multi - WW - EN, ES, DE, JP, PT, KR, FR", "start": "2024-11-20", "end": "2024-12-13", "fq": "FY24 Q4", "gnarr": 0.04, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reduced Mode", "name": "RGS0370 - Premium Markers v2 - Reduced Mode - Multi - WW - EN, DE, JP, FR, ES, PT, KR", "start": "2024-11-20", "end": "2024-12-27", "fq": "FY24 Q4", "gnarr": 0.04, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0374 - LHP Collapsed CTA - Reader - Multi - WW - EN, DE, FR, JP, ES, PT, KR", "start": "2025-01-28", "end": "2025-03-11", "fq": "FY25 Q1", "gnarr": null, "winner": "FAB Badge experience intereference", "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0377 - Unified Share Sheet - Reader - Multi - WW - EN", "start": "2025-02-06", "end": "2025-02-21", "fq": "FY25 Q1", "gnarr": 0.023, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reduced Mode", "name": "RGS0378 - LHP Collapsed CTA - Reduced Mode - Multi - WW - EN, ES, DE, JP, PT, KR, FR", "start": "2025-02-06", "end": "2025-02-24", "fq": "FY25 Q1", "gnarr": null, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0381 - Express Edit Image - Reader - Multi - WW - EN", "start": "2025-02-22", "end": "2025-04-04", "fq": "FY25 Q1", "gnarr": -0.062, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0376 - Organize Pages - Deeper Experience - Reader - Multi - WW - EN, DE, JP, FR, ES, PT, KR", "start": "2025-03-11", "end": "2025-04-18", "fq": "FY25 Q2", "gnarr": 0.01, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reduced Mode", "name": "RGS0383 - Edit MV - Text Formatting - Reduced Mode - Multi - WW - EN, DE, JP, FR, ES, PT, KR", "start": "2025-03-20", "end": "2025-05-06", "fq": "FY25 Q2", "gnarr": 0.034, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0384 - Gen AI Persistent Summary - Reader - Multi - WW - EN", "start": "2025-04-04", "end": "2025-05-05", "fq": "FY25 Q2", "gnarr": 0.021, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0385 -\u00a0 OS RCM PDF - Reader - Multi - WW - EN, DE, JP, FR, ES, PT, KR", "start": "2025-04-18", "end": "2025-05-22", "fq": "FY25 Q2", "gnarr": 0.029, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reduced Mode", "name": "RGS0388 - Combine Files - Deeper Experience - Reduced Mode - Multi - WW - EN, DE, JP, FR, ES, PT, KR", "start": "2025-05-12", "end": "2025-06-16", "fq": "FY25 Q2", "gnarr": 0.025, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0401 - Edit MV - Text Formatting - Reader - Multi - WW - EN, DE, JP, FR, ES, PT, KR", "start": "2025-06-13", "end": "2025-07-11", "fq": "FY25 Q3", "gnarr": 0.023, "winner": null, "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0410 - Multicat Testing - C - Reader - Multi - WW - EN", "start": "2025-06-17", "end": "2025-08-11", "fq": "FY25 Q3", "gnarr": null, "winner": null, "status": "Complete", "details": "A/A"}, {"product": "Acrobat Reader", "name": "RGS0409 - Multicat Testing - B - Reader - Multi - WW - EN", "start": "2025-06-17", "end": "2025-08-11", "fq": "FY25 Q3", "gnarr": null, "winner": null, "status": "Complete", "details": "A/A"}, {"product": "Acrobat Reader", "name": "RGS0404 - Multicat Testing - A - Reader - Multi - WW - EN", "start": "2025-06-17", "end": "2025-08-11", "fq": "FY25 Q3", "gnarr": null, "winner": null, "status": "Complete", "details": "A/A"}, {"product": "Acrobat Reduced Mode", "name": "RGS0406 - Organize Pages Subtools - Reduced Mode - Multi - WW - EN, DE, JP, FR, ES, PT, KR", "start": "2025-06-20", "end": "2025-08-11", "fq": "FY25 Q3", "gnarr": null, "winner": null, "status": "Complete", "details": "Bugged"}, {"product": "Acrobat Reader", "name": "RGS0420 - Free/Paid Nudge (TCAT) - Reader - Multi - WW - EN", "start": "2025-08-21", "end": "2025-09-30", "fq": "FY25 Q3", "gnarr": 0.02, "winner": "Rollout", "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0419 - Multicat Testing v2 - B - Reader - Multi - WW - EN", "start": "2025-08-21", "end": "2025-10-17", "fq": "FY25 Q3", "gnarr": null, "winner": null, "status": "Complete", "details": "A/A"}, {"product": "Acrobat Reader", "name": "RGS0418 - Multicat Testing v2 - A - Reader - Multi - WW - EN", "start": "2025-08-21", "end": "2025-10-17", "fq": "FY25 Q3", "gnarr": null, "winner": null, "status": "Complete", "details": "A/A"}, {"product": "Acrobat Reader", "name": "RGS0416 - Free/Paid Nudge (Multicat) - Reader - Multi - WW - EN", "start": "2025-08-21", "end": "2025-10-17", "fq": "FY25 Q3", "gnarr": null, "winner": "Rollout", "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0402 - Organize Pages Subtools - Reader - Multi - WW - DE, JP, FR, ES, PT, KR", "start": "2025-08-28", "end": "2025-09-29", "fq": "FY25 Q3", "gnarr": null, "winner": "Rollout", "status": "Complete", "details": "EN was slightly negative, but rolled out due to non-EN result"}, {"product": "Acrobat Reduced Mode", "name": "RGS0424 - Premium Feature Indicator - Reduced Mode - Multi - WW - EN, DE, JP, FR, ES, PT, KR", "start": "2025-08-28", "end": "2025-10-17", "fq": "FY25 Q3", "gnarr": -0.004, "winner": "Rollout", "status": "Complete", "details": "Was within tolerance for go-ahead"}, {"product": "Acrobat Reader", "name": "RGS0387 - Combine Files - Deeper Experience - Reader - Multi - WW - EN", "start": "2025-10-17", "end": "2025-11-20", "fq": "FY25 Q4", "gnarr": 0.015, "winner": "Rollout", "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0429 - Export Microtrial OTT - Reader - Multi - WW - EN", "start": "2025-10-17", "end": "2025-12-07", "fq": "FY25 Q4", "gnarr": null, "winner": "Control", "status": "Complete", "details": "Had to use Dunamis for results due to rollout error, results were directional only"}, {"product": "Acrobat Reader", "name": "RGS0402 - Organize Pages Subtools - Reader - Multi - WW - EN", "start": "2025-10-17", "end": "2025-11-20", "fq": "FY25 Q4", "gnarr": -0.006, "winner": "Rollout", "status": "Complete", "details": "non-EN was highly positive"}, {"product": "Acrobat Reader", "name": "RGS0430 - Gen AI - SLM - Reader - Multi - WW - EN", "start": "2025-10-17", "end": "2025-11-04", "fq": "FY25 Q4", "gnarr": 0.031, "winner": "Rollout", "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0431 - Create PDF Upsell Modal Experience - Reader - Multi - WW - EN", "start": "2025-10-17", "end": "2025-11-21", "fq": "FY25 Q4", "gnarr": 0.001, "winner": "Control", "status": "Complete", "details": "Need to test with Export PDF to create PDF services experience consistency"}, {"product": "Acrobat Reader", "name": "RGS0434 - Harmony - Pre-Test 4% - Reader - Multi - WW - EN", "start": "2025-11-01", "end": "2025-12-16", "fq": "FY25 Q4", "gnarr": null, "winner": null, "status": "Complete", "details": "Was non-upsell to determine best experience to use for eventual upsell test"}, {"product": "Acrobat Reader", "name": "RGS0440 - Export Microtrial OTT - Reader - Multi - WW - DE, JP, FR, ES, PT, KR", "start": "2025-11-12", "end": "2026-01-15", "fq": "FY25 Q4", "gnarr": 0.018, "winner": "Control", "status": "Complete", "details": "Ch3 very positive, but not developed for EN rerun"}, {"product": "Acrobat Reader", "name": "RGS0438 - Combine Files - Deeper Experience - Reader - Multi - WW - DE, JP, FR, ES, PT, KR", "start": "2025-11-14", "end": "2026-01-15", "fq": "FY25 Q4", "gnarr": -0.003, "winner": "Control", "status": "Complete", "details": "Did not rollout although was positive and rolled out in EN"}, {"product": "Acrobat Reader", "name": "RGS0439 - Create PDF Upsell Modal Experience - Reader - Multi - WW - DE, JP, FR, ES, PT, KR", "start": "2025-11-14", "end": "2026-01-13", "fq": "FY25 Q4", "gnarr": 0.003, "winner": "Control", "status": "Complete", "details": "Need to test with Export PDF to create PDF services experience consistency"}, {"product": "Acrobat Reduced Mode", "name": "RGS0435 - Next-Best Action (NBA) - Reduced Mode - Multi - WW - EN, DE, JP, FR, ES, PT, KR", "start": "2025-11-14", "end": "2025-12-18", "fq": "FY25 Q4", "gnarr": 0.018, "winner": "Control", "status": "Complete", "details": "Not rolled out due to Reader?"}, {"product": "Acrobat Reduced Mode", "name": "RGS0436 - Persistent Banner Upsell Modals - Reduced Mode - Multi - WW - EN, DE, JP, FR, ES, PT, KR", "start": "2025-11-14", "end": "2025-12-18", "fq": "FY25 Q4", "gnarr": -0.006, "winner": "Control", "status": "Complete", "details": null}, {"product": "Acrobat Reduced Mode", "name": "RGS0437 - Organize Pages Subtools v2 - Reduced Mode - Multi - WW - EN, DE, JP, FR, ES, PT, KR", "start": "2025-11-14", "end": "2025-12-18", "fq": "FY25 Q4", "gnarr": -0.012, "winner": "Control", "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0443 - Next-Best Action (NBA) - Reader - Multi - WW - EN", "start": "2025-11-23", "end": "2026-01-15", "fq": "FY25 Q4", "gnarr": -0.009, "winner": "Control", "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0441 - PDF Spaces - Reader - Multi - WW - EN", "start": "2025-11-26", "end": "2026-01-15", "fq": "FY25 Q4", "gnarr": -0.021, "winner": "Rollout", "status": "Complete", "details": "Was waiting for engagement result and needed to either revert or rollout to 50% for cohort split reasons"}, {"product": "Acrobat Reader", "name": "RGS0433 - Biz Pro Home - New Users - Reader - Multi - WW - EN", "start": "2025-12-04", "end": "2026-01-13", "fq": "FY26 Q1", "gnarr": -0.019, "winner": "Control", "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0452 - Organize Pages - Deeper Experience - Edit MV - Reader - Multi - WW - EN", "start": "2025-12-08", "end": "2026-01-13", "fq": "FY26 Q1", "gnarr": -0.008, "winner": "Control", "status": "Complete", "details": null}, {"product": "Acrobat Reader", "name": "RGS0453 - Free User Onboarding (DNH) - Reader - Multi - WW - EN", "start": "2025-12-10", "end": "2026-01-05", "fq": "FY26 Q1", "gnarr": null, "winner": "Control", "status": "Complete", "details": "Bugged"}, {"product": "Acrobat Reader", "name": "RGS0447 - FVP Card on Second Modal - Reader - Multi - WW - EN", "start": "2025-12-17", "end": "2026-01-27", "fq": "FY26 Q1", "gnarr": -0.002, "winner": "Control", "status": "Complete", "details": null}, {"product": "Acrobat Reduced Mode", "name": "RGS0462 - Edit Nudge in DMB - Reduced Mode - Multi - WW - EN, DE, JP, FR, ES, PT, KR", "start": "2026-01-30", "end": "2026-03-08", "fq": "FY26 Q1", "gnarr": 0.009, "winner": "Challenger 2", "status": "Complete", "details": "Revert to control\nNegative in EN, which pulls the result down. If we remove EN, the result is stat sig with non-EN locales QARR impact at $5,02,333"}, {"product": "Acrobat Reader", "name": "RGS0454 - PDF Actions - Reader - Multi - WW - EN", "start": "2026-02-02", "end": "2026-03-05", "fq": "FY26 Q1", "gnarr": 0.022, "winner": "Challenger 2", "status": "Complete", "details": "Rolled Challenger 2"}, {"product": "Acrobat Reader", "name": "RGS0456 - Create PDF Maker Anonymous B - Reader - Multi - WW - EN", "start": "2026-02-02", "end": "2026-03-05", "fq": "FY26 Q1", "gnarr": 0.009, "winner": "Challenger 1", "status": "Complete", "details": "Rolled Challenger 1"}, {"product": "Acrobat Reader", "name": "RGS0455 - Create PDF Maker Anonymous A - Reader - Multi - WW - EN", "start": "2026-02-02", "end": "2026-03-05", "fq": "FY26 Q1", "gnarr": 0.008, "winner": "Control", "status": "Complete", "details": "RGS0456 represents the RTP of this experience, this test was for A/A comparison of multi-tcat validation"}, {"product": "Acrobat Reader", "name": "RGS0459 - Create PDF Maker Anonymous - Reader - Multi - WW - DE, JP, FR, ES, PT, KR", "start": "2026-02-02", "end": "2026-03-05", "fq": "FY26 Q1", "gnarr": 0.027, "winner": "Challenger 1", "status": "Complete", "details": "Rolled Challenger 1"}, {"product": "Acrobat Reader", "name": "RGS0461 - Edit Nudge in DMB - Reader - Multi - WW - DE, JP, FR, ES, PT, KR", "start": "2026-02-02", "end": "2026-03-05", "fq": "FY26 Q1", "gnarr": 0.017, "winner": "Challenger 2", "status": "Complete", "details": "Revert to control"}, {"product": "Acrobat Reduced Mode", "name": "RGS0464 - PDF Actions - Reduced Mode - Multi - WW - EN", "start": "2026-02-02", "end": "2026-03-05", "fq": "FY26 Q1", "gnarr": 0.024, "winner": "Challenger 1", "status": "Complete", "details": "Rolled Challenger 2\nCurrently, we've rolled out Challenger 2 in Reduced Mode, based on dashboard reads which were inaccurate."}, {"product": "Acrobat Reduced Mode", "name": "RGS0463 - Organize Pages - Deeper Experience - Edit MV - Reduced Mode - Multi - WW - EN, DE, JP, FR, ES, PT, KR", "start": "2026-02-02", "end": "2026-03-05", "fq": "FY26 Q1", "gnarr": null, "winner": "Control", "status": "Complete", "details": "Rolled Challenger 1"}, {"product": "Acrobat Reduced Mode", "name": "RGS0469 - NBA v2 - Reduced Mode - Multi - WW - EN", "start": "2026-04-02", "end": "2026-04-17", "fq": "FY26 Q2", "gnarr": null, "winner": null, "status": "Running", "details": null}, {"product": "Acrobat Reduced Mode", "name": "RGS0483 - NBA v2 - Reduced Mode - Multi - WW - DE, JP, FR, ES, KR", "start": "2026-04-02", "end": "2026-04-17", "fq": "FY26 Q2", "gnarr": null, "winner": null, "status": "Running", "details": null}, {"product": "Acrobat Reader", "name": "RGS0467 - NBA v2 - Reader - Multi - WW - EN", "start": "2026-03-20", "end": "2026-04-17", "fq": "FY26 Q2", "gnarr": null, "winner": null, "status": "Running", "details": null}, {"product": "Acrobat Reader", "name": "RGS0482 - NBA v2 - Reader - Multi - WW - DE, JP, FR, ES, KR", "start": "2026-03-20", "end": "2026-04-17", "fq": "FY26 Q2", "gnarr": null, "winner": null, "status": "Running", "details": null}, {"product": "Acrobat Reader", "name": "RGS0480 - Export PDF Direct Upsell Modal - Reader - Multi - WW - EN", "start": "2026-03-20", "end": "2026-04-17", "fq": "FY26 Q2", "gnarr": null, "winner": null, "status": "Running", "details": null}], "quarters": [{"label": "FY23 Q1", "start": "2022-12-03", "end": "2023-03-03"}, {"label": "FY23 Q2", "start": "2023-03-04", "end": "2023-06-02"}, {"label": "FY23 Q3", "start": "2023-06-03", "end": "2023-09-01"}, {"label": "FY23 Q4", "start": "2023-09-02", "end": "2023-12-01"}, {"label": "FY24 Q1", "start": "2023-12-02", "end": "2024-03-01"}, {"label": "FY24 Q2", "start": "2024-03-02", "end": "2024-05-31"}, {"label": "FY24 Q3", "start": "2024-06-01", "end": "2024-08-30"}, {"label": "FY24 Q4", "start": "2024-08-31", "end": "2024-11-29"}, {"label": "FY25 Q1", "start": "2024-11-30", "end": "2025-02-28"}, {"label": "FY25 Q2", "start": "2025-03-01", "end": "2025-05-30"}, {"label": "FY25 Q3", "start": "2025-05-31", "end": "2025-08-29"}, {"label": "FY25 Q4", "start": "2025-08-30", "end": "2025-11-28"}, {"label": "FY26 Q1", "start": "2025-11-29", "end": "2026-02-27"}, {"label": "FY26 Q2", "start": "2026-02-28", "end": "2026-05-29"}, {"label": "FY26 Q3", "start": "2026-05-30", "end": "2026-08-28"}, {"label": "FY26 Q4", "start": "2026-08-29", "end": "2026-11-27"}, {"label": "FY27 Q1", "start": "2026-11-28", "end": "2027-02-26"}, {"label": "FY27 Q2", "start": "2027-02-27", "end": "2027-05-28"}, {"label": "FY27 Q3", "start": "2027-05-29", "end": "2027-08-27"}, {"label": "FY27 Q4", "start": "2027-08-28", "end": "2027-11-26"}]};
+const TESTS = RAW_DATA.tests;
+const QUARTERS = RAW_DATA.quarters.filter(q => {
+  const qStart = new Date(q.start), qEnd = new Date(q.end);
+  return TESTS.some(t => {
+    const ts = new Date(t.start), te = new Date(t.end);
+    return ts <= qEnd && te >= qStart;
+  });
+});
+const WEEKS = [];
+QUARTERS.forEach(q => {
+  const qs = new Date(q.start);
+  for (let w = 0; w < 13; w++) {
+    const ws = new Date(qs.getTime() + w * 7 * 86400000);
+    const we = new Date(ws.getTime() + 6 * 86400000);
+    WEEKS.push({ start: ws, end: we, num: w + 1, fq: q.label });
+  }
+});
+const fqSet = [...new Set(TESTS.map(t => t.fq))];
+const productSet = [...new Set(TESTS.map(t => t.product))];
+const fqSel = document.getElementById('fqFilter');
+const prodSel = document.getElementById('productFilter');
+fqSet.forEach(f => { const o = document.createElement('option'); o.value = f; o.text = f; fqSel.add(o); });
+productSet.forEach(p => { const o = document.createElement('option'); o.value = p; o.text = p; prodSel.add(o); });
+let CELL_W = 22;
+const ROW_H = 28;
+const tooltip = document.getElementById('tooltip');
+function getFiltered() {
+  const fq = fqSel.value, prod = prodSel.value;
+  const status = document.getElementById('statusFilter').value;
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  return TESTS.filter(t => {
+    if (fq !== 'All' && t.fq !== fq) return false;
+    if (prod !== 'All' && t.product !== prod) return false;
+    if (status !== 'All' && t.status !== status) return false;
+    if (search && !t.name.toLowerCase().includes(search)) return false;
+    return true;
+  });
+}
+function getVisibleWeeks() {
+  const fq = fqSel.value;
+  if (fq === 'All') return WEEKS;
+  return WEEKS.filter(w => w.fq === fq);
+}
+function fmtDate(s) { const d = new Date(s); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+function fmtPct(v) { return v !== null ? (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%' : '\u2014'; }
+function render() {
+  const filtered = getFiltered();
+  const visWeeks = getVisibleWeeks();
+  const running = filtered.filter(t => t.status === 'Running').length;
+  const avgLift = filtered.filter(t => t.gnarr !== null);
+  const avg = avgLift.length ? (avgLift.reduce((s, t) => s + t.gnarr, 0) / avgLift.length * 100).toFixed(2) : '\u2014';
+  document.getElementById('statsBar').innerHTML = `<span>${filtered.length} tests</span><span>${running} running</span><span>Avg GNARR Lift: ${avg}%</span>`;
+  const lp = document.getElementById('leftPanel');
+  lp.innerHTML = `<div class="left-header"><div>Product</div><div>Test Name</div><div>GNARR Lift</div><div>Winner</div></div>`;
+  filtered.forEach((t, i) => {
+    const bg = i % 2 ? 'background:var(--row-alt);' : '';
+    const gClass = t.gnarr !== null ? (t.gnarr > 0 ? 'gnarr-pos' : t.gnarr < 0 ? 'gnarr-neg' : '') : '';
+    let winnerHtml = '\u2014';
+    if (t.winner) {
+      if (t.winner.startsWith('Challenger')) winnerHtml = `<span class="winner-challenger">${t.winner}</span>`;
+      else if (t.winner === 'Control') winnerHtml = `<span class="winner-control">Control</span>`;
+      else if (t.winner === 'Rollout') winnerHtml = `<span class="winner-rollout">Rollout</span>`;
+      else winnerHtml = t.winner;
+    }
+    if (t.status === 'Running') winnerHtml = `<span class="status-running">Running</span>`;
+    const row = document.createElement('div');
+    row.className = 'left-row';
+    row.setAttribute('style', bg + `height:${ROW_H}px;`);
+    row.innerHTML = `<div title="${t.product}">${t.product}</div><div title="${t.name}">${t.name}</div><div class="${gClass}">${fmtPct(t.gnarr)}</div><div>${winnerHtml}</div>`;
+    lp.appendChild(row);
+  });
+  const rp = document.getElementById('rightPanel');
+  const fqGroups = {};
+  visWeeks.forEach(w => { if (!fqGroups[w.fq]) fqGroups[w.fq] = []; fqGroups[w.fq].push(w); });
+  const fqColors = ['#1F4E78', '#2E75B6', '#4472C4', '#5B9BD5'];
+  let fqHtml = '<div class="fq-row">', ci = 0;
+  Object.entries(fqGroups).forEach(([fq, wks]) => {
+    const w = wks.length * CELL_W;
+    fqHtml += `<div class="fq-label" style="width:${w}px;min-width:${w}px;background:${fqColors[ci % 4]};">${fq}</div>`;
+    ci++;
+  });
+  fqHtml += '</div>';
+  let wkHtml = '<div class="week-row">';
+  visWeeks.forEach(w => {
+    const mon = w.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    wkHtml += `<div class="week-cell" style="width:${CELL_W}px;min-width:${CELL_W}px;background:#4472C4;"><span class="wk-num">W${w.num}</span><span>${mon}</span></div>`;
+  });
+  wkHtml += '</div>';
+  let barsHtml = '';
+  filtered.forEach((t, i) => {
+    const ts = new Date(t.start), te = new Date(t.end);
+    const bg = i % 2 ? 'background:var(--row-alt);' : '';
+    let rowHtml = `<div class="bar-row" style="${bg}height:${ROW_H}px;" data-idx="${i}">`;
+    visWeeks.forEach((w, wi) => {
+      const overlap = ts <= w.end && te >= w.start;
+      const cls = w.num === 1 ? 'bar-cell qtr-start' : 'bar-cell';
+      rowHtml += `<div class="${cls}" style="width:${CELL_W}px;min-width:${CELL_W}px;height:${ROW_H}px;">`;
+      if (overlap) {
+        const barStart = Math.max(ts.getTime(), w.start.getTime());
+        const barEnd = Math.min(te.getTime(), w.end.getTime());
+        const left = ((barStart - w.start.getTime()) / (7 * 86400000)) * CELL_W;
+        const right = ((w.end.getTime() - barEnd) / (7 * 86400000)) * CELL_W;
+        const fillClass = t.status === 'Running' ? 'running' : 'complete';
+        rowHtml += `<div class="bar-fill ${fillClass}" style="left:${Math.round(left)}px;right:${Math.round(right)}px;"></div>`;
+      }
+      rowHtml += '</div>';
+    });
+    rowHtml += '</div>';
+    barsHtml += rowHtml;
+  });
+  rp.innerHTML = `<div class="timeline-header">${fqHtml}${wkHtml}</div>${barsHtml}`;
+  lp.onscroll = () => { rp.scrollTop = lp.scrollTop; };
+  rp.onscroll = () => { lp.scrollTop = rp.scrollTop; };
+  const wrapH = window.innerHeight - document.getElementById('ganttWrapper').getBoundingClientRect().top;
+  document.getElementById('ganttWrapper').style.height = wrapH + 'px';
+  lp.style.maxHeight = wrapH + 'px';
+  rp.style.maxHeight = wrapH + 'px';
+  rp.querySelectorAll('.bar-row').forEach((row, i) => {
+    const t = filtered[i];
+    row.addEventListener('mouseenter', (e) => {
+      tooltip.style.display = 'block';
+      tooltip.innerHTML = `
+        <div class="tt-title">${t.name}</div>
+        <div class="tt-row"><span class="tt-label">Product</span><span class="tt-value">${t.product}</span></div>
+        <div class="tt-row"><span class="tt-label">Fiscal Quarter</span><span class="tt-value">${t.fq}</span></div>
+        <div class="tt-row"><span class="tt-label">Dates</span><span class="tt-value">${fmtDate(t.start)} \u2014 ${fmtDate(t.end)}</span></div>
+        <div class="tt-row"><span class="tt-label">Duration</span><span class="tt-value">${Math.round((new Date(t.end) - new Date(t.start)) / 86400000)} days</span></div>
+        <hr>
+        <div class="tt-row"><span class="tt-label">GNARR Lift</span><span class="tt-value" style="color:${t.gnarr > 0 ? 'var(--green)' : t.gnarr < 0 ? 'var(--red)' : 'inherit'}">${fmtPct(t.gnarr)}</span></div>
+        <div class="tt-row"><span class="tt-label">Winner</span><span class="tt-value">${t.winner || '\u2014'}</span></div>
+        <div class="tt-row"><span class="tt-label">Status</span><span class="tt-value">${t.status}</span></div>
+        ${t.details ? `<hr><div style="font-size:11px;color:var(--text-muted);margin-top:4px;">${t.details}</div>` : ''}
+      `;
+    });
+    row.addEventListener('mousemove', (e) => {
+      tooltip.style.left = Math.min(e.clientX + 12, window.innerWidth - 400) + 'px';
+      tooltip.style.top = Math.min(e.clientY + 12, window.innerHeight - 250) + 'px';
+    });
+    row.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+  });
+  rp.querySelectorAll('.bar-row').forEach((row, i) => {
+    row.addEventListener('mouseenter', () => { const lr = lp.querySelectorAll('.left-row')[i]; if (lr) lr.style.background = 'var(--blue-light)'; });
+    row.addEventListener('mouseleave', () => { const lr = lp.querySelectorAll('.left-row')[i]; if (lr) lr.style.background = ''; });
+  });
+}
+fqSel.addEventListener('change', render);
+prodSel.addEventListener('change', render);
+document.getElementById('statusFilter').addEventListener('change', render);
+document.getElementById('searchInput').addEventListener('input', render);
+document.getElementById('zoomSlider').addEventListener('input', (e) => { CELL_W = parseInt(e.target.value); render(); });
+window.addEventListener('resize', render);
+render();
+</script>
+</body>
+</html>
