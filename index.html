@@ -69,7 +69,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 17, 2026 at 01:31 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 17, 2026 at 04:06 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <select id="fqFilter"><option value="All">All Quarters</option></select>
@@ -210,8 +210,8 @@ function render() {
   rp.innerHTML = `<div class="timeline-header">${fqHtml}${wkHtml}</div>${barsHtml}`;
   lp.onscroll = () => { rp.scrollTop = lp.scrollTop; };
   rp.onscroll = () => { lp.scrollTop = rp.scrollTop; };
-  const wrapH = window.innerHeight - document.getElementById('ganttWrapper').getBoundingClientRect().top;
-  document.getElementById('ganttWrapper').style.height = wrapH + 'px';
+  let wrapH = window.innerHeight - document.getElementById('ganttWrapper').getBoundingClientRect().top;
+   if (wrapH < 200) wrapH = Math.max(600, filtered.length * ROW_H + 60);  document.getElementById('ganttWrapper').style.height = wrapH + 'px';
   lp.style.maxHeight = wrapH + 'px';
   rp.style.maxHeight = wrapH + 'px';
   rp.querySelectorAll('.bar-row').forEach((row, i) => {
