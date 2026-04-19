@@ -32,9 +32,9 @@
   .gantt-wrapper { display: flex; overflow: hidden; border-top: 1px solid var(--border); flex: 1; min-height: 0; }
   .left-panel { flex-shrink: 0; overflow-y: auto; border-right: 2px solid var(--border); background: var(--surface); height: 100%; }
   .left-panel::-webkit-scrollbar { display: none; }
-  .left-header { display: grid; grid-template-columns: 130px 1fr 90px; position: sticky; top: 0; z-index: 10; }
+  .left-header { display: grid; grid-template-columns: 130px 1fr 105px; position: sticky; top: 0; z-index: 10; }
   .left-header > div { padding: 8px 8px; font-size: 11px; font-weight: 600; color: white; background: var(--blue-dark); border-bottom: 1px solid var(--border); border-right: 1px solid rgba(255,255,255,0.1); white-space: nowrap; }
-  .left-row { display: grid; grid-template-columns: 130px 1fr 90px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+  .left-row { display: grid; grid-template-columns: 130px 1fr 105px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
   .left-row:hover { background: var(--blue-light) !important; }
   .left-row > div { padding: 4px 8px; font-size: 11px; overflow: hidden; text-overflow: ellipsis; border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center; }
   .left-row .cell-main { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -43,10 +43,10 @@
   .left-row .metric.pos { color: var(--green); background: var(--green-bg); }
   .left-row .metric.neg { color: var(--red); background: var(--red-bg); }
   .left-row .metric.neutral { color: var(--text-muted); background: #edf2f7; }
-  .left-row .winner-challenger { color: var(--green); background: var(--green-bg); font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; }
-  .left-row .winner-control { color: var(--red); background: var(--red-bg); font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; }
-  .left-row .winner-rollout { color: var(--blue-dark); background: var(--blue-light); font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; }
-  .left-row .status-running { color: var(--gold-dark); background: var(--gold-bg); font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; }
+  .left-row .winner-challenger { color: var(--green); background: var(--green-bg); font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; white-space: nowrap; }
+  .left-row .winner-control { color: var(--red); background: var(--red-bg); font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; white-space: nowrap; }
+  .left-row .winner-rollout { color: var(--blue-dark); background: var(--blue-light); font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; white-space: nowrap; }
+  .left-row .status-running { color: var(--gold-dark); background: var(--gold-bg); font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; white-space: nowrap; }
   .right-panel { flex: 1; overflow-x: auto; overflow-y: auto; height: 100%; }
   .right-panel::-webkit-scrollbar { height: 10px; }
   .right-panel::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 5px; }
@@ -97,7 +97,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 18, 2026 at 07:33 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 18, 2026 at 08:18 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
