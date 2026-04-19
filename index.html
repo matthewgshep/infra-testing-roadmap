@@ -109,7 +109,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 11:42 AM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 12:30 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -237,68 +237,72 @@ function fmtCompact(v) {
   return '$' + Math.round(v).toLocaleString();
 }
 function calcRevenueByQuarter(tests) {
-  // For each quarter, calculate:
-  // 1. QGNARR Total: sum of QGNARR for tests that have data and were active in that quarter
-  // 2. Realized: prorated by weeks active in each quarter (QGNARR / 13 × weeks_in_quarter)
-  // 3. Projected: for current + future quarters, the ongoing per-quarter revenue
+  // For each selected quarter, calculate:
+  // 1. QGNARR Pool: sum of QGNARR for tests active in that quarter
+  // 2. Realized: prorated by weeks active (QGNARR / 13 × weeks_in_quarter)
+  // 3. For winners (Rollout/Challenger): project remaining weeks of the quarter they completed in
+  const visibleFQs = selectedFQs.size > 0 ? [...selectedFQs] : [];
+  if (visibleFQs.length === 0 || visibleFQs.length > 4) return [];
   const qMap = {};
   QUARTERS.forEach(q => {
-    qMap[q.label] = { label: q.label, start: new Date(q.start), end: new Date(q.end), qgnarrTotal: 0, realized: 0, testCount: 0 };
+    if (!visibleFQs.includes(q.label)) return;
+    qMap[q.label] = { label: q.label, start: new Date(q.start), end: new Date(q.end), qgnarrTotal: 0, realized: 0, projected: 0, testCount: 0 };
   });
   tests.forEach(t => {
     if (t.qgnarr === null) return;
     const ts = new Date(t.start), te = new Date(t.end);
     const weeklyValue = t.qgnarr / 13;
-    QUARTERS.forEach(q => {
-      const qs = new Date(q.start), qe = new Date(q.end);
+    const isWinner = t.winner && (t.winner === 'Rollout' || t.winner.startsWith('Challenger'));
+    Object.values(qMap).forEach(qObj => {
+      const qs = qObj.start, qe = qObj.end;
       if (ts <= qe && te >= qs) {
         // Test was active in this quarter
         const overlapStart = Math.max(ts.getTime(), qs.getTime());
         const overlapEnd = Math.min(te.getTime(), qe.getTime());
-        const activeWeeks = Math.max(1, Math.round((overlapEnd - overlapStart) / (7 * 86400000)) + 1);
-        const clampedWeeks = Math.min(activeWeeks, 13);
-        if (qMap[q.label]) {
-          qMap[q.label].qgnarrTotal += t.qgnarr;
-          qMap[q.label].realized += weeklyValue * clampedWeeks;
-          qMap[q.label].testCount++;
-        }
-      }
-      // For projected: if test ended before this quarter but QGNARR is ongoing revenue
-      // (test rolled out), count full quarter revenue for subsequent quarters
-      if (te < qs && t.winner && (t.winner === 'Rollout' || t.winner.startsWith('Challenger'))) {
-        if (qMap[q.label]) {
-          qMap[q.label].realized += t.qgnarr;
+        const activeWeeks = Math.min(13, Math.max(1, Math.round((overlapEnd - overlapStart) / (7 * 86400000)) + 1));
+        qObj.qgnarrTotal += t.qgnarr;
+        qObj.realized += weeklyValue * activeWeeks;
+        qObj.testCount++;
+        // For winners: project remaining weeks of this quarter after test ended
+        if (isWinner && te < qe) {
+          const remainingMs = qe.getTime() - te.getTime();
+          const remainingWeeks = Math.min(13 - activeWeeks, Math.max(0, Math.floor(remainingMs / (7 * 86400000))));
+          qObj.projected += weeklyValue * remainingWeeks;
         }
       }
     });
   });
-  // Return only quarters that have data
-  return Object.values(qMap).filter(q => q.qgnarrTotal > 0 || q.realized > 0);
+  return Object.values(qMap).filter(q => q.qgnarrTotal > 0 || q.realized > 0 || q.projected > 0);
 }
 function renderRevenueStrip(filtered) {
   const strip = document.getElementById('revenueStrip');
   const revData = calcRevenueByQuarter(filtered);
   if (revData.length === 0) { strip.innerHTML = ''; return; }
-  // Rolling total
-  let rollingTotal = 0;
-  revData.forEach(q => rollingTotal += q.realized);
+  let rollingRealized = 0, rollingProjected = 0;
+  revData.forEach(q => { rollingRealized += q.realized; rollingProjected += q.projected; });
   let html = '';
   revData.forEach(q => {
+    const projHtml = q.projected > 0 ? `<div class="rev-item"><span class="rev-label">Projected</span><span class="rev-val" style="color:var(--blue);">${fmtCompact(q.projected)}</span></div>` : '';
     html += `<div class="rev-card">
       <div class="rev-fq">${q.label}</div>
       <div class="rev-metrics">
         <div class="rev-item"><span class="rev-label">QGNARR Pool</span><span class="rev-val">${fmtCompact(q.qgnarrTotal)}</span></div>
         <div class="rev-item"><span class="rev-label">Realized</span><span class="rev-val highlight">${fmtCompact(q.realized)}</span></div>
+        ${projHtml}
         <div class="rev-item"><span class="rev-label">Tests</span><span class="rev-val">${q.testCount}</span></div>
       </div>
     </div>`;
   });
-  html += `<div class="rev-card rev-total">
-    <div class="rev-fq">Rolling Total</div>
-    <div class="rev-metrics">
-      <div class="rev-item"><span class="rev-label">Total Realized</span><span class="rev-val highlight">${fmtCompact(rollingTotal)}</span></div>
-    </div>
-  </div>`;
+  if (revData.length > 1) {
+    const projTotal = rollingProjected > 0 ? `<div class="rev-item"><span class="rev-label">Total Projected</span><span class="rev-val" style="color:var(--blue);">${fmtCompact(rollingProjected)}</span></div>` : '';
+    html += `<div class="rev-card rev-total">
+      <div class="rev-fq">Rolling Total</div>
+      <div class="rev-metrics">
+        <div class="rev-item"><span class="rev-label">Total Realized</span><span class="rev-val highlight">${fmtCompact(rollingRealized)}</span></div>
+        ${projTotal}
+      </div>
+    </div>`;
+  }
   strip.innerHTML = html;
 }
 function buildDetailHtml(t) {
