@@ -97,7 +97,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 18, 2026 at 05:25 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 18, 2026 at 07:05 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -270,7 +270,7 @@ function render() {
       return `<span class="metric ${cls}">${label} ${fmtPct(val)}</span>`;
     }
     const qgnarrChip = t.qgnarr !== null ? chip('QGNARR', t.qgnarr, true) : '';
-    const metricsHtml = chip('GNARR', t.gnarr, false) + qgnarrChip + chip('CTR', t.ctr, false) + chip('Units', t.units_pct, false);
+    const metricsHtml = qgnarrChip + chip('GNARR', t.gnarr, false) + chip('CTR', t.ctr, false) + chip('Units', t.units_pct, false);
     const row = document.createElement('div');
     row.className = 'left-row';
     row.dataset.idx = i;
