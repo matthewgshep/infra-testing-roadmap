@@ -109,7 +109,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 12:30 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 12:37 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -249,7 +249,7 @@ function calcRevenueByQuarter(tests) {
     qMap[q.label] = { label: q.label, start: new Date(q.start), end: new Date(q.end), qgnarrTotal: 0, realized: 0, projected: 0, testCount: 0 };
   });
   tests.forEach(t => {
-    if (t.qgnarr === null) return;
+    if (t.qgnarr === null || t.status === 'Running') return;
     const ts = new Date(t.start), te = new Date(t.end);
     const weeklyValue = t.qgnarr / 13;
     const isWinner = t.winner && (t.winner === 'Rollout' || t.winner.startsWith('Challenger'));
