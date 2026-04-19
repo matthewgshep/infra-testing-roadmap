@@ -269,7 +269,7 @@ function render() {
       const cls = val > 0 ? 'pos' : val < 0 ? 'neg' : 'neutral';
       return `<span class="metric ${cls}">${label} ${fmtPct(val)}</span>`;
     }
-    const qgnarrChip = t.qgnarr !== null ? chip('QGNARR', t.qgnarr, true) : '';
+    const qgnarrChip = chip('QGNARR', t.qgnarr, true);
     const metricsHtml = qgnarrChip + chip('GNARR', t.gnarr, false) + chip('CTR', t.ctr, false) + chip('Units', t.units_pct, false);
     const row = document.createElement('div');
     row.className = 'left-row';
