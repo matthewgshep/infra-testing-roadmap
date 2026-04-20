@@ -126,7 +126,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 09:40 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 09:45 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -235,10 +235,8 @@ fqDisplay.addEventListener('click', (e) => {
 });
 document.addEventListener('click', () => fqDropdown.classList.remove('open'));
 fqDropdown.addEventListener('click', (e) => e.stopPropagation());
-// Default zoom: fit one quarter (13 weeks) to the viewport width
-const leftPanelW = 130 + 200 + 105 + 2; // grid columns + border
-let CELL_W = Math.max(8, Math.min(80, Math.floor((window.innerWidth - leftPanelW) / 13)));
-document.getElementById('zoomSlider').value = CELL_W;
+// Initial CELL_W — will be recalculated after first render to fit 13 weeks
+let CELL_W = 22;
 const ROW_H = 42;
 const tooltip = document.getElementById('tooltip');
 function getFiltered() {
@@ -506,7 +504,17 @@ prodSel.addEventListener('change', render);
 document.getElementById('statusFilter').addEventListener('change', render);
 document.getElementById('searchInput').addEventListener('input', render);
 document.getElementById('zoomSlider').addEventListener('input', (e) => { CELL_W = parseInt(e.target.value); render(); });
+// First render to establish DOM layout, then measure right panel and fit 13 weeks
 render();
+requestAnimationFrame(() => {
+  const rp = document.getElementById('rightPanel');
+  const rpW = rp.clientWidth;
+  if (rpW > 100) {
+    CELL_W = Math.max(8, Math.min(80, Math.floor(rpW / 13)));
+    document.getElementById('zoomSlider').value = CELL_W;
+    render();
+  }
+});
 // ── View tab switching ──
 document.querySelectorAll('.view-tab').forEach(tab => {
   tab.addEventListener('click', () => {
