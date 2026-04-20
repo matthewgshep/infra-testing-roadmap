@@ -126,7 +126,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 09:33 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 09:40 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -143,7 +143,7 @@
   </div>
 </div>
 <div class="view-tabs">
-  <div class="view-tab active" data-view="gantt">Gantt View</div>
+  <div class="view-tab active" data-view="gantt">Results Roadmap</div>
   <div class="view-tab" data-view="scatter">Experiment Lift</div>
 </div>
 <div class="view-panel active" id="ganttView">
@@ -235,7 +235,10 @@ fqDisplay.addEventListener('click', (e) => {
 });
 document.addEventListener('click', () => fqDropdown.classList.remove('open'));
 fqDropdown.addEventListener('click', (e) => e.stopPropagation());
-let CELL_W = 80;
+// Default zoom: fit one quarter (13 weeks) to the viewport width
+const leftPanelW = 130 + 200 + 105 + 2; // grid columns + border
+let CELL_W = Math.max(8, Math.min(80, Math.floor((window.innerWidth - leftPanelW) / 13)));
+document.getElementById('zoomSlider').value = CELL_W;
 const ROW_H = 42;
 const tooltip = document.getElementById('tooltip');
 function getFiltered() {
@@ -631,9 +634,6 @@ function renderScatter() {
     const t = filtered[i];
     dot.addEventListener('mouseenter', (e) => {
       tooltip.style.display = 'block';
-      const gdsLink = t.gds_url ? `<a href="${t.gds_url}" target="_blank" style="color:var(--blue);text-decoration:underline;">${esc(t.gds_text) || 'Link'}</a>` : '\u2014';
-      const detailNote = t.details ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:11px;line-height:1.4;color:var(--text);max-width:350px;">${esc(t.details)}</div>` : '';
-      const pmNote = t.pm_commentary ? `<div style="margin-top:4px;font-size:11px;line-height:1.4;color:var(--text-muted);max-width:350px;"><em>${esc(t.pm_commentary)}</em></div>` : '';
       tooltip.innerHTML = `
         <div class="tt-title">${esc(t.name)}</div>
         <div class="tt-row"><span class="tt-label">Product</span><span class="tt-value">${esc(t.product)}</span></div>
@@ -645,9 +645,6 @@ function renderScatter() {
         <div class="tt-row"><span class="tt-label">GNARR Lift</span><span class="tt-value" style="color:${t.gnarr > 0 ? 'var(--green)' : t.gnarr < 0 ? 'var(--red)' : 'inherit'}">${fmtPct(t.gnarr)}</span></div>
         <div class="tt-row"><span class="tt-label">CTR</span><span class="tt-value">${fmtPct(t.ctr)}</span></div>
         <div class="tt-row"><span class="tt-label">Units %</span><span class="tt-value">${fmtPct(t.units_pct)}</span></div>
-        <hr>
-        <div class="tt-row"><span class="tt-label">GDS</span><span class="tt-value">${gdsLink}</span></div>
-        ${detailNote}${pmNote}
       `;
     });
     dot.addEventListener('mousemove', (e) => {
