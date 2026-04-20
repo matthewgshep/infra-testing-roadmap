@@ -137,7 +137,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 20, 2026 at 03:48 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 20, 2026 at 04:20 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -295,6 +295,8 @@ function calcRevenueByQuarter(tests) {
   });
   const DAY_MS = 86400000;
   const Q_DAYS = 91; // 13 weeks × 7 days
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   tests.forEach(t => {
     if (t.qgnarr === null || t.status === 'Running') return;
     const ts = new Date(t.start), te = new Date(t.end);
@@ -303,21 +305,24 @@ function calcRevenueByQuarter(tests) {
     Object.values(qMap).forEach(qObj => {
       const qs = qObj.start, qe = qObj.end;
       if (te >= qs && te <= qe) {
-        // Days from test end to quarter end (inclusive of end date)
-        const realizedDays = Math.min(Q_DAYS, Math.max(1, Math.round((qe.getTime() - te.getTime()) / DAY_MS) + 1));
-        const remainingDays = Q_DAYS - realizedDays;
+        // Realized: days from test end to min(today, quarter end)
+        const realizedEnd = today < qe ? today : qe;
+        const realizedDays = Math.min(Q_DAYS, Math.max(0, Math.round((realizedEnd.getTime() - te.getTime()) / DAY_MS) + 1));
         const realizedAmt = dailyValue * realizedDays;
+        // Remaining: days from today (or test end, whichever is later) to quarter end
+        const remainStart = today > te ? today : te;
+        const remainingDays = Math.max(0, Math.round((qe.getTime() - remainStart.getTime()) / DAY_MS));
         qObj.qgnarrTotal += t.qgnarr;
         qObj.realized += realizedAmt;
         qObj.testCount++;
-        let projectedAmt = 0;
+        let remainingAmt = 0;
         if (isWinner && remainingDays > 0) {
-          projectedAmt = dailyValue * remainingDays;
-          qObj.projected += projectedAmt;
+          remainingAmt = dailyValue * remainingDays;
+          qObj.projected += remainingAmt;
         }
         qObj.contributions.push({
           name: t.name, product: t.product, winner: t.winner,
-          qgnarr: t.qgnarr, realized: realizedAmt, projected: projectedAmt,
+          qgnarr: t.qgnarr, realized: realizedAmt, remaining: remainingAmt,
           endDate: t.end, days: realizedDays
         });
       }
@@ -331,7 +336,7 @@ function renderRevenueStrip(filtered) {
   if (revData.length === 0) { strip.innerHTML = ''; return; }
   let html = '';
   revData.forEach((q, qi) => {
-    const projHtml = q.projected > 0 ? `<div class="rev-item"><span class="rev-label">Projected</span><span class="rev-val" style="color:var(--blue);">${fmtCompact(q.projected)}</span></div>` : '';
+    const remainHtml = q.projected > 0 ? `<div class="rev-item"><span class="rev-label">Remaining</span><span class="rev-val" style="color:var(--blue);">${fmtCompact(q.projected)}</span></div>` : '';
     // Build detail table rows
     const sorted = q.contributions.slice().sort((a, b) => b.qgnarr - a.qgnarr);
     let tableRows = '';
@@ -353,9 +358,9 @@ function renderRevenueStrip(filtered) {
     html += `<div class="rev-card" style="position:relative;">
       <div class="rev-fq">${q.label}<span class="rev-expand" data-qi="${qi}">&#9660;</span></div>
       <div class="rev-metrics">
-        <div class="rev-item"><span class="rev-label">QGNARR Pool</span><span class="rev-val">${fmtCompact(q.qgnarrTotal)}</span></div>
-        <div class="rev-item"><span class="rev-label">Realized</span><span class="rev-val highlight">${fmtCompact(q.realized)}</span></div>
-        ${projHtml}
+        <div class="rev-item"><span class="rev-label">QGNARR Projection</span><span class="rev-val">${fmtCompact(q.qgnarrTotal)}</span></div>
+        <div class="rev-item"><span class="rev-label">Realized in Quarter</span><span class="rev-val highlight">${fmtCompact(q.realized)}</span></div>
+        ${remainHtml}
         <div class="rev-item"><span class="rev-label">Tests</span><span class="rev-val">${q.testCount}</span></div>
       </div>
       <div class="rev-detail-popout" id="revDetail${qi}">
