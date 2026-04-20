@@ -111,7 +111,7 @@
   .view-tab.active { color: var(--blue-dark); border-bottom-color: var(--blue); }
   .view-panel { display: none; flex: 1; min-height: 0; }
   .view-panel.active { display: flex; flex-direction: column; }
-  .scatter-container { flex: 1; position: relative; padding: 20px 60px 50px 70px; overflow: hidden; background: var(--surface); }
+  .scatter-container { flex: 1; position: relative; padding: 0; overflow: hidden; background: var(--surface); }
   .scatter-svg { width: 100%; height: 100%; }
   .scatter-dot { cursor: pointer; transition: r 0.1s; }
   .scatter-dot:hover { r: 7; }
@@ -126,7 +126,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 09:12 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 09:18 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -518,9 +518,16 @@ document.querySelectorAll('.view-tab').forEach(tab => {
 function renderScatter() {
   const svg = document.getElementById('scatterSvg');
   const container = document.getElementById('scatterContainer');
+  // Use rAF to ensure panel has layout after display:flex switch
   const W = container.clientWidth;
   const H = container.clientHeight;
-  const pad = { top: 30, right: 30, bottom: 50, left: 60 };
+  if (W < 100 || H < 100) {
+    requestAnimationFrame(renderScatter);
+    return;
+  }
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  const pad = { top: 40, right: 40, bottom: 60, left: 70 };
   const plotW = W - pad.left - pad.right;
   const plotH = H - pad.top - pad.bottom;
   // Filter tests with GNARR data
