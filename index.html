@@ -126,7 +126,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 09:18 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 09:22 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -518,7 +518,6 @@ document.querySelectorAll('.view-tab').forEach(tab => {
 function renderScatter() {
   const svg = document.getElementById('scatterSvg');
   const container = document.getElementById('scatterContainer');
-  // Use rAF to ensure panel has layout after display:flex switch
   const W = container.clientWidth;
   const H = container.clientHeight;
   if (W < 100 || H < 100) {
@@ -530,26 +529,40 @@ function renderScatter() {
   const pad = { top: 40, right: 40, bottom: 60, left: 70 };
   const plotW = W - pad.left - pad.right;
   const plotH = H - pad.top - pad.bottom;
-  // Filter tests with GNARR data
-  const filtered = getFiltered().filter(t => t.gnarr !== null);
-  if (filtered.length === 0) { svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#718096" font-size="14">No tests with GNARR data in current filter</text>'; return; }
-  // Compute ranges
-  const dates = filtered.map(t => new Date(t.end).getTime());
+  // Rolling 24-month window — ignore quarter filter, use product/status/search only
+  const now = new Date();
+  const windowStart = new Date(now.getFullYear() - 2, now.getMonth(), 1);
+  const windowEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  // Apply product/status/search filters but NOT quarter filter
+  const product = prodSel.value;
+  const status = document.getElementById('statusFilter').value;
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const filtered = TESTS.filter(t => {
+    if (t.gnarr === null) return false;
+    const te = new Date(t.end);
+    if (te < windowStart || te > windowEnd) return false;
+    if (product !== 'All' && t.product !== product) return false;
+    if (status !== 'All' && t.status !== status) return false;
+    if (search && !t.name.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  if (filtered.length === 0) { svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#718096" font-size="14">No tests with GNARR data in the last 24 months</text>'; return; }
+  // Fixed X-axis: windowStart to windowEnd (24 months)
+  const minDate = windowStart.getTime();
+  const maxDate = windowEnd.getTime();
+  const dateRange = maxDate - minDate;
+  // Y-axis from data
   const lifts = filtered.map(t => t.gnarr * 100);
-  const minDate = Math.min(...dates), maxDate = Math.max(...dates);
-  const dateRange = maxDate - minDate || 1;
   const maxLift = Math.ceil(Math.max(...lifts, 1));
   const minLift = Math.floor(Math.min(...lifts, -1));
   const liftRange = maxLift - minLift || 1;
-  // Avg line
   const avg = lifts.reduce((s, v) => s + v, 0) / lifts.length;
   function xPos(d) { return pad.left + ((d - minDate) / dateRange) * plotW; }
   function yPos(v) { return pad.top + ((maxLift - v) / liftRange) * plotH; }
-  // Color logic
   function dotColor(lift) {
     if (lift >= 0.5) return '#006100';
     if (lift <= -0.5) return '#9C0006';
-    return '#FFC000';
+    return '#BF8F00';
   }
   function dotFill(lift) {
     if (lift >= 0.5) return '#22c55e';
@@ -557,7 +570,7 @@ function renderScatter() {
     return '#FFC000';
   }
   let html = '';
-  // Grid lines
+  // Y-axis grid lines
   for (let v = Math.ceil(minLift); v <= Math.floor(maxLift); v += 1) {
     if (v === 0) continue;
     const y = yPos(v);
@@ -569,20 +582,16 @@ function renderScatter() {
     html += `<line x1="${pad.left}" y1="${yPos(0)}" x2="${pad.left + plotW}" y2="${yPos(0)}" class="scatter-zero"/>`;
     html += `<text x="${pad.left - 8}" y="${yPos(0) + 3}" text-anchor="end" class="scatter-axis" style="font-weight:600;">0%</text>`;
   }
-  // X-axis date labels (monthly ticks)
-  const startMonth = new Date(minDate);
-  startMonth.setDate(1);
-  const endMonth = new Date(maxDate);
-  endMonth.setMonth(endMonth.getMonth() + 1);
-  const tickDate = new Date(startMonth);
-  while (tickDate <= endMonth) {
+  // X-axis: monthly ticks across the full 24-month window
+  const tickDate = new Date(windowStart);
+  while (tickDate <= windowEnd) {
     const x = xPos(tickDate.getTime());
     if (x >= pad.left && x <= pad.left + plotW) {
       const label = tickDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
       html += `<line x1="${x}" y1="${pad.top + plotH}" x2="${x}" y2="${pad.top + plotH + 6}" stroke="#a0aec0"/>`;
       html += `<text x="${x}" y="${pad.top + plotH + 20}" text-anchor="middle" class="scatter-axis">${label}</text>`;
     }
-    tickDate.setMonth(tickDate.getMonth() + 2);
+    tickDate.setMonth(tickDate.getMonth() + 1);
   }
   // Axis labels
   html += `<text x="${pad.left + plotW / 2}" y="${H - 5}" text-anchor="middle" class="scatter-axis-label">Test End Date</text>`;
