@@ -108,7 +108,7 @@
   .rev-expand { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--blue-light); color: var(--blue-dark); font-size: 10px; cursor: pointer; margin-left: 6px; vertical-align: middle; transition: background 0.15s, transform 0.15s; }
   .rev-expand:hover { background: var(--blue); color: white; }
   .rev-expand.open { transform: rotate(180deg); }
-  .rev-detail-popout { display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 40; background: var(--surface); border: 1px solid var(--border); border-top: 2px solid var(--blue); border-radius: 0 0 8px 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-height: 260px; overflow-y: auto; }
+  .rev-detail-popout { display: none; position: fixed; z-index: 80; background: var(--surface); border: 1px solid var(--border); border-top: 2px solid var(--blue); border-radius: 0 0 8px 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); max-height: 280px; overflow-y: auto; min-width: 500px; }
   .rev-detail-popout.open { display: block; }
   .rev-detail-table { width: 100%; border-collapse: collapse; font-size: 11px; }
   .rev-detail-table th { text-align: left; padding: 6px 10px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); border-bottom: 1px solid var(--border); background: #f7fafc; position: sticky; top: 0; }
@@ -137,7 +137,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 10:04 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 10:07 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -364,7 +364,7 @@ function renderRevenueStrip(filtered) {
     </div>`;
   });
   strip.innerHTML = html;
-  // Wire up expand buttons — use mousedown to beat the document click close
+  // Wire up expand buttons
   strip.querySelectorAll('.rev-expand').forEach(btn => {
     btn.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -376,12 +376,18 @@ function renderRevenueStrip(filtered) {
       strip.querySelectorAll('.rev-detail-popout').forEach(p => p.classList.remove('open'));
       strip.querySelectorAll('.rev-expand').forEach(b => b.classList.remove('open'));
       if (!isOpen) {
+        // Position the popout below the card using fixed coords
+        const card = btn.closest('.rev-card');
+        const rect = card.getBoundingClientRect();
+        popout.style.top = rect.bottom + 'px';
+        popout.style.left = rect.left + 'px';
+        popout.style.minWidth = Math.max(500, rect.width) + 'px';
         popout.classList.add('open');
         btn.classList.add('open');
       }
     });
   });
-  // Also stop clicks inside the popout from closing it
+  // Stop clicks inside the popout from closing it
   strip.querySelectorAll('.rev-detail-popout').forEach(p => {
     p.addEventListener('mousedown', (e) => e.stopPropagation());
   });
