@@ -109,7 +109,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 12:37 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 08:38 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -255,19 +255,17 @@ function calcRevenueByQuarter(tests) {
     const isWinner = t.winner && (t.winner === 'Rollout' || t.winner.startsWith('Challenger'));
     Object.values(qMap).forEach(qObj => {
       const qs = qObj.start, qe = qObj.end;
-      if (ts <= qe && te >= qs) {
-        // Test was active in this quarter
-        const overlapStart = Math.max(ts.getTime(), qs.getTime());
-        const overlapEnd = Math.min(te.getTime(), qe.getTime());
-        const activeWeeks = Math.min(13, Math.max(1, Math.round((overlapEnd - overlapStart) / (7 * 86400000)) + 1));
+      // Only count if the test concluded in this quarter
+      if (te >= qs && te <= qe) {
+        // Realized: weeks from test end date to end of this quarter
+        const realizedMs = qe.getTime() - te.getTime();
+        const realizedWeeks = Math.min(13, Math.max(1, Math.round(realizedMs / (7 * 86400000)) + 1));
         qObj.qgnarrTotal += t.qgnarr;
-        qObj.realized += weeklyValue * activeWeeks;
+        qObj.realized += weeklyValue * realizedWeeks;
         qObj.testCount++;
-        // For winners: project remaining weeks of this quarter after test ended
-        if (isWinner && te < qe) {
-          const remainingMs = qe.getTime() - te.getTime();
-          const remainingWeeks = Math.min(13 - activeWeeks, Math.max(0, Math.floor(remainingMs / (7 * 86400000))));
-          qObj.projected += weeklyValue * remainingWeeks;
+        // For winners: project remaining weeks of this quarter after realized period
+        if (isWinner && realizedWeeks < 13) {
+          qObj.projected += weeklyValue * (13 - realizedWeeks);
         }
       }
     });
@@ -278,8 +276,6 @@ function renderRevenueStrip(filtered) {
   const strip = document.getElementById('revenueStrip');
   const revData = calcRevenueByQuarter(filtered);
   if (revData.length === 0) { strip.innerHTML = ''; return; }
-  let rollingRealized = 0, rollingProjected = 0;
-  revData.forEach(q => { rollingRealized += q.realized; rollingProjected += q.projected; });
   let html = '';
   revData.forEach(q => {
     const projHtml = q.projected > 0 ? `<div class="rev-item"><span class="rev-label">Projected</span><span class="rev-val" style="color:var(--blue);">${fmtCompact(q.projected)}</span></div>` : '';
@@ -293,16 +289,6 @@ function renderRevenueStrip(filtered) {
       </div>
     </div>`;
   });
-  if (revData.length > 1) {
-    const projTotal = rollingProjected > 0 ? `<div class="rev-item"><span class="rev-label">Total Projected</span><span class="rev-val" style="color:var(--blue);">${fmtCompact(rollingProjected)}</span></div>` : '';
-    html += `<div class="rev-card rev-total">
-      <div class="rev-fq">Rolling Total</div>
-      <div class="rev-metrics">
-        <div class="rev-item"><span class="rev-label">Total Realized</span><span class="rev-val highlight">${fmtCompact(rollingRealized)}</span></div>
-        ${projTotal}
-      </div>
-    </div>`;
-  }
   strip.innerHTML = html;
 }
 function buildDetailHtml(t) {
