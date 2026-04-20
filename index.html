@@ -137,7 +137,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 10:00 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 10:04 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -320,7 +320,7 @@ function calcRevenueByQuarter(tests) {
       }
     });
   });
-  return Object.values(qMap).filter(q => q.qgnarrTotal > 0 || q.realized > 0 || q.projected > 0);
+  return Object.values(qMap);
 }
 function renderRevenueStrip(filtered) {
   const strip = document.getElementById('revenueStrip');
@@ -332,6 +332,9 @@ function renderRevenueStrip(filtered) {
     // Build detail table rows
     const sorted = q.contributions.slice().sort((a, b) => b.qgnarr - a.qgnarr);
     let tableRows = '';
+    if (sorted.length === 0) {
+      tableRows = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:14px;">No completed tests in this quarter</td></tr>`;
+    }
     sorted.forEach(c => {
       const winCls = c.winner && c.winner.startsWith('Challenger') ? 'winner-challenger' : c.winner === 'Control' ? 'winner-control' : c.winner === 'Rollout' ? 'winner-rollout' : '';
       const winHtml = c.winner ? `<span class="${winCls}">${c.winner}</span>` : '\u2014';
@@ -361,9 +364,10 @@ function renderRevenueStrip(filtered) {
     </div>`;
   });
   strip.innerHTML = html;
-  // Wire up expand buttons
+  // Wire up expand buttons — use mousedown to beat the document click close
   strip.querySelectorAll('.rev-expand').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
       e.stopPropagation();
       const qi = btn.dataset.qi;
       const popout = document.getElementById('revDetail' + qi);
@@ -377,12 +381,19 @@ function renderRevenueStrip(filtered) {
       }
     });
   });
-  // Close popout when clicking outside
-  document.addEventListener('click', () => {
-    strip.querySelectorAll('.rev-detail-popout').forEach(p => p.classList.remove('open'));
-    strip.querySelectorAll('.rev-expand').forEach(b => b.classList.remove('open'));
+  // Also stop clicks inside the popout from closing it
+  strip.querySelectorAll('.rev-detail-popout').forEach(p => {
+    p.addEventListener('mousedown', (e) => e.stopPropagation());
   });
 }
+// Global: close revenue popouts when clicking anywhere else
+document.addEventListener('mousedown', () => {
+  const strip = document.getElementById('revenueStrip');
+  if (strip) {
+    strip.querySelectorAll('.rev-detail-popout').forEach(p => p.classList.remove('open'));
+    strip.querySelectorAll('.rev-expand').forEach(b => b.classList.remove('open'));
+  }
+});
 function buildDetailHtml(t) {
   const dur = Math.round((new Date(t.end) - new Date(t.start)) / 86400000);
   let html = '<div class="detail-grid">';
