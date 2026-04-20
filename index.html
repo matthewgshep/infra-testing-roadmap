@@ -109,7 +109,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 08:38 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 19, 2026 at 08:55 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -215,7 +215,16 @@ function getFiltered() {
   const status = document.getElementById('statusFilter').value;
   const search = document.getElementById('searchInput').value.toLowerCase();
   return TESTS.filter(t => {
-    if (selectedFQs.size > 0 && !selectedFQs.has(t.fq)) return false;
+    if (selectedFQs.size > 0) {
+      // Show test if it overlaps with any selected quarter
+      const ts = new Date(t.start), te = new Date(t.end);
+      const overlaps = QUARTERS.some(q => {
+        if (!selectedFQs.has(q.label)) return false;
+        const qs = new Date(q.start), qe = new Date(q.end);
+        return ts <= qe && te >= qs;
+      });
+      if (!overlaps) return false;
+    }
     if (prod !== 'All' && t.product !== prod) return false;
     if (status !== 'All' && t.status !== status) return false;
     if (search && !t.name.toLowerCase().includes(search)) return false;
