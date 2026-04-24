@@ -186,7 +186,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 24, 2026 at 02:41 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 24, 2026 at 02:44 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -596,7 +596,20 @@ function render() {
     rowHtml += `<div class="detail-row" id="detail-right-${i}" style="min-height:0;"></div>`;
     barsHtml += rowHtml;
   });
-  rp.innerHTML = `<div class="timeline-header">${fqHtml}${wkHtml}</div>${barsHtml}`;
+  // Today indicator line for results roadmap
+  let ganttTodayHtml = '';
+  for (let i = 0; i < visWeeks.length; i++) {
+    const w = visWeeks[i];
+    if (_now >= w.start.getTime() && _now < w.end.getTime() + _DAY_MS) {
+      const frac = (_now - w.start.getTime()) / (7 * _DAY_MS);
+      const todayX = i * CELL_W + frac * CELL_W;
+      ganttTodayHtml = `<div style="position:absolute;left:${todayX}px;top:0;bottom:0;width:2px;background:var(--red);z-index:8;pointer-events:none;">
+        <div style="position:absolute;top:0;left:-20px;width:42px;text-align:center;background:var(--red);color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:0 0 4px 4px;">Today</div>
+      </div>`;
+      break;
+    }
+  }
+  rp.innerHTML = `<div class="timeline-header">${fqHtml}${wkHtml}</div><div style="position:relative;">${barsHtml}${ganttTodayHtml}</div>`;
   lp.onscroll = () => { rp.scrollTop = lp.scrollTop; };
   rp.onscroll = () => { lp.scrollTop = rp.scrollTop; };
   // Click to expand/collapse detail rows
