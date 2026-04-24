@@ -186,7 +186,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 24, 2026 at 12:40 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 24, 2026 at 12:45 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -925,9 +925,9 @@ const PLAN_ROW_H = 40;
 let plannedItems = []; // { id, name, product, startWeek, durationWeeks }
 
 function planGetQuarters() {
-  // Current quarter + 4 future quarters (5 total) from ALL quarters
+  // Current quarter + 1 future quarter
   const today = new Date();
-  return ALL_QUARTERS.filter(q => new Date(q.end) >= today).slice(0, 5);
+  return ALL_QUARTERS.filter(q => new Date(q.end) >= today).slice(0, 2);
 }
 
 function planWeeks(quarters) {
@@ -966,17 +966,20 @@ function renderPlan() {
 
   // Build timeline header (quarter + week labels)
   let hdrHtml = `<div style="position:sticky;top:0;z-index:10;">`;
-  // Quarter row
+  // Quarter row — each quarter spans exactly 13 week cells
   hdrHtml += `<div style="display:flex;margin-left:${labelW}px;">`;
-  quarters.forEach(q => {
-    hdrHtml += `<div style="width:${13 * PLAN_CELL}px;background:var(--blue-dark);color:white;text-align:center;font-size:11px;font-weight:700;padding:4px 0;border-right:2px solid rgba(255,255,255,0.3);">${q.label}</div>`;
+  quarters.forEach((q, qi) => {
+    // Sum the widths of the 13 week cells for this quarter (each PLAN_CELL + 1px border)
+    const qWidth = 13 * PLAN_CELL;
+    const borderStyle = qi < quarters.length - 1 ? 'border-right:1px solid rgba(255,255,255,0.3);' : '';
+    hdrHtml += `<div style="width:${qWidth}px;min-width:${qWidth}px;box-sizing:border-box;background:var(--blue-dark);color:white;text-align:center;font-size:11px;font-weight:700;padding:4px 0;${borderStyle}">${q.label}</div>`;
   });
   hdrHtml += `</div>`;
   // Week row
   hdrHtml += `<div style="display:flex;margin-left:${labelW}px;">`;
   weeks.forEach(w => {
     const mon = w.start.toLocaleDateString('en-US', { month: 'short' });
-    hdrHtml += `<div style="width:${PLAN_CELL}px;min-width:${PLAN_CELL}px;background:#4472C4;color:white;text-align:center;font-size:8px;padding:2px 0;border-right:1px solid rgba(255,255,255,0.15);"><span style="font-weight:700;font-size:9px;">W${w.num}</span><br>${mon}</div>`;
+    hdrHtml += `<div style="width:${PLAN_CELL}px;min-width:${PLAN_CELL}px;box-sizing:border-box;background:#4472C4;color:white;text-align:center;font-size:8px;padding:2px 0;border-right:1px solid rgba(255,255,255,0.15);"><span style="font-weight:700;font-size:9px;">W${w.num}</span><br>${mon}</div>`;
   });
   hdrHtml += `</div></div>`;
 
