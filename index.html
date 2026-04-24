@@ -186,7 +186,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 24, 2026 at 01:08 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 24, 2026 at 01:46 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -240,9 +240,12 @@
     <div class="plan-main">
       <div class="plan-toolbar">
         <span style="font-weight:600;color:var(--blue-dark);">Drag experiments from the backlog onto the timeline</span>
+        <span id="planSaveStatus" style="font-size:10px;color:var(--text-muted);"></span>
         <span style="flex:1;"></span>
         <button onclick="planClearAll()">Clear All</button>
-        <button class="primary" onclick="planExport()">Export Plan</button>
+        <button onclick="planExport()">Export JSON</button>
+        <button class="primary" id="planSaveBtn" disabled style="opacity:0.5;" onclick="planSaveToGitHub()">Save Plan</button>
+        <button onclick="ghClearToken()" style="padding:5px 8px;font-size:9px;color:var(--text-muted);border:none;background:none;cursor:pointer;" title="Clear saved GitHub token">⚙</button>
       </div>
       <div class="plan-timeline" id="planTimeline"></div>
     </div>
@@ -656,7 +659,7 @@ function renderActive() {
   render();
   if (view === 'scatter') renderScatter();
   if (view === 'list') renderList();
-  if (view === 'plan') renderPlan();
+  if (view === 'plan') { planLoadSaved().then(() => renderPlan()); }
 }
 prodSel.addEventListener('change', renderActive);
 document.getElementById('statusFilter').addEventListener('change', renderActive);
@@ -682,7 +685,7 @@ document.querySelectorAll('.view-tab').forEach(tab => {
     document.getElementById(tab.dataset.view + 'View').classList.add('active');
     if (tab.dataset.view === 'scatter') renderScatter();
     if (tab.dataset.view === 'list') renderList();
-    if (tab.dataset.view === 'plan') renderPlan();
+    if (tab.dataset.view === 'plan') { planLoadSaved().then(() => renderPlan()); }
   });
 });
 // ── Experiment List Table ──
@@ -924,6 +927,153 @@ const AVG_DURATION = RAW_DATA.avgDuration || {};
 const PLAN_CELL = 50; // px per week
 const PLAN_ROW_H = 40;
 let plannedItems = []; // { id, name, product, startWeek, durationWeeks }
+let _planLoaded = false;
+let _planDirty = false;
+const GH_REPO = 'matthewgshep/infra-testing-roadmap';
+const GH_FILE = 'plan.json';
+
+function ghGetToken() { return localStorage.getItem('gh_plan_token') || ''; }
+function ghSetToken(t) { localStorage.setItem('gh_plan_token', t); }
+function ghClearToken() { localStorage.removeItem('gh_plan_token'); }
+
+function ghPromptToken() {
+  const t = prompt('Enter a GitHub Personal Access Token with Contents read/write permission for ' + GH_REPO + ':\n\n(Fine-grained token → Repository access → Only select ' + GH_REPO.split('/')[1] + ' → Contents: Read and write)');
+  if (t && t.trim()) { ghSetToken(t.trim()); return true; }
+  return false;
+}
+
+function planMarkDirty() {
+  _planDirty = true;
+  const btn = document.getElementById('planSaveBtn');
+  const statusEl = document.getElementById('planSaveStatus');
+  if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  if (statusEl) { statusEl.textContent = 'Unsaved changes'; statusEl.style.color = 'var(--gold)'; }
+}
+
+function planBuildPayload() {
+  const quarters = planGetQuarters();
+  const weeks = planWeeks(quarters);
+  return plannedItems.map(p => ({
+    name: p.name,
+    product: p.product,
+    startDate: p.startDate,
+    durationWeeks: p.durationWeeks,
+    fqWeek: weeks[p.startWeek] ? weeks[p.startWeek].fq + ' W' + weeks[p.startWeek].num : '',
+    endDate: weeks[Math.min(p.startWeek + p.durationWeeks - 1, weeks.length - 1)]
+      ? weeks[Math.min(p.startWeek + p.durationWeeks - 1, weeks.length - 1)].end.toISOString().slice(0, 10) : ''
+  }));
+}
+
+function planDateToWeekIdx(dateStr, weeks) {
+  const d = new Date(dateStr).getTime();
+  for (let i = 0; i < weeks.length; i++) {
+    if (d >= weeks[i].start.getTime() && d <= weeks[i].end.getTime()) return i;
+    if (d < weeks[i].start.getTime()) return Math.max(0, i);
+  }
+  return -1; // outside visible range
+}
+
+async function planLoadSaved() {
+  if (_planLoaded) return;
+  const statusEl = document.getElementById('planSaveStatus');
+  try {
+    const resp = await fetch(GH_FILE + '?_=' + Date.now());
+    if (!resp.ok) { _planLoaded = true; return; }
+    const saved = await resp.json();
+    if (!Array.isArray(saved) || saved.length === 0) { _planLoaded = true; return; }
+    const quarters = planGetQuarters();
+    const weeks = planWeeks(quarters);
+    plannedItems = [];
+    saved.forEach(s => {
+      const wi = planDateToWeekIdx(s.startDate, weeks);
+      if (wi < 0) return; // skip items outside visible range
+      plannedItems.push({
+        id: Date.now() + Math.random(),
+        name: s.name,
+        product: s.product,
+        startWeek: wi,
+        durationWeeks: s.durationWeeks || 4,
+        startDate: s.startDate
+      });
+    });
+    _planLoaded = true;
+    _planDirty = false;
+    if (statusEl && plannedItems.length > 0) {
+      statusEl.textContent = '✓ Loaded ' + plannedItems.length + ' items';
+      statusEl.style.color = 'var(--green)';
+      setTimeout(() => { if (statusEl) { statusEl.textContent = ''; } }, 3000);
+    }
+    renderPlan();
+  } catch(e) {
+    _planLoaded = true;
+    if (statusEl) {
+      statusEl.textContent = 'Could not load saved plan';
+      statusEl.style.color = 'var(--text-muted)';
+    }
+  }
+}
+
+async function planSaveToGitHub() {
+  let token = ghGetToken();
+  if (!token) {
+    if (!ghPromptToken()) return;
+    token = ghGetToken();
+  }
+  const statusEl = document.getElementById('planSaveStatus');
+  const btn = document.getElementById('planSaveBtn');
+  if (statusEl) { statusEl.textContent = 'Saving to GitHub...'; statusEl.style.color = 'var(--blue)'; }
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+
+  const plan = planBuildPayload();
+  const contentB64 = btoa(unescape(encodeURIComponent(JSON.stringify(plan, null, 2))));
+
+  try {
+    // Get current SHA if file exists
+    const getResp = await fetch('https://api.github.com/repos/' + GH_REPO + '/contents/' + GH_FILE, {
+      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    let sha = null;
+    if (getResp.ok) {
+      const gd = await getResp.json();
+      sha = gd.sha;
+    }
+
+    const body = {
+      message: 'Update experiment plan (' + plan.length + ' items)',
+      content: contentB64
+    };
+    if (sha) body.sha = sha;
+
+    const putResp = await fetch('https://api.github.com/repos/' + GH_REPO + '/contents/' + GH_FILE, {
+      method: 'PUT',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (putResp.ok) {
+      _planDirty = false;
+      if (statusEl) { statusEl.textContent = '✓ Saved ' + plan.length + ' items to GitHub'; statusEl.style.color = 'var(--green)'; }
+      if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+      setTimeout(() => { if (statusEl) { statusEl.textContent = ''; } }, 4000);
+    } else {
+      const err = await putResp.json();
+      if (putResp.status === 401 || putResp.status === 403) {
+        ghClearToken();
+        if (statusEl) { statusEl.textContent = '✗ Token invalid — click Save to re-enter'; statusEl.style.color = 'var(--red)'; }
+      } else {
+        if (statusEl) { statusEl.textContent = '✗ Save failed: ' + (err.message || putResp.status); statusEl.style.color = 'var(--red)'; }
+      }
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    }
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = '✗ Network error'; statusEl.style.color = 'var(--red)'; }
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  }
+}
 
 function planGetQuarters() {
   // Current quarter + 1 future quarter
@@ -1113,6 +1263,7 @@ function renderPlan() {
     if (dragGhost) { dragGhost.remove(); dragGhost = null; }
     dragItem = null;
     renderPlan();
+    planMarkDirty();
   });
 
   // ── Drag to move / resize planned bars ──
@@ -1125,6 +1276,7 @@ function renderPlan() {
       e.stopPropagation();
       plannedItems.splice(pi, 1);
       renderPlan();
+      planMarkDirty();
     });
 
     // Resize handles
@@ -1156,6 +1308,7 @@ function renderPlan() {
           document.removeEventListener('mouseup', onUp);
           item.startDate = weeks[Math.min(item.startWeek, weeks.length - 1)].start.toISOString().slice(0, 10);
           renderPlan();
+          planMarkDirty();
         }
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
@@ -1180,6 +1333,7 @@ function renderPlan() {
         document.removeEventListener('mouseup', onUp);
         item.startDate = weeks[Math.min(item.startWeek, weeks.length - 1)].start.toISOString().slice(0, 10);
         renderPlan();
+        planMarkDirty();
       }
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
@@ -1207,6 +1361,7 @@ function calcBarWidth(start, end, weeks) {
 function planClearAll() {
   plannedItems = [];
   renderPlan();
+  planMarkDirty();
 }
 
 function planExport() {
