@@ -186,7 +186,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 24, 2026 at 01:46 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 24, 2026 at 02:15 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -209,12 +209,7 @@
   <div class="view-tab" data-view="plan">Planning Roadmap</div>
 </div>
 <div class="view-panel active" id="ganttView">
-<div class="legend">
-  <span style="font-weight:600;">Legend:</span>
-  <div class="legend-item"><div class="legend-swatch" style="background:var(--blue);"></div> Complete</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:repeating-linear-gradient(45deg,var(--gold),var(--gold) 3px,#ffdb4d 3px,#ffdb4d 6px);"></div> Running</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:var(--green-bg);border:1px solid var(--green);"></div> Challenger Win</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:var(--red-bg);border:1px solid var(--red);"></div> Control Win</div>
+<div class="legend" style="display:none;">
 </div>
 <div class="stats" id="statsBar"></div>
 <div class="revenue-strip" id="revenueStrip"></div>
@@ -565,10 +560,13 @@ function render() {
     ci++;
   });
   fqHtml += '</div>';
+  const _now = Date.now();
   let wkHtml = '<div class="week-row">';
   visWeeks.forEach(w => {
     const mon = w.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    wkHtml += `<div class="week-cell" style="width:${CELL_W}px;min-width:${CELL_W}px;background:#4472C4;"><span class="wk-num">W${w.num}</span><span>${mon}</span></div>`;
+    const isCurr = _now >= w.start.getTime() && _now <= w.end.getTime();
+    const wkBg = isCurr ? 'background:#2E5A8A;' : 'background:#4472C4;';
+    wkHtml += `<div class="week-cell" style="width:${CELL_W}px;min-width:${CELL_W}px;${wkBg}"><span class="wk-num">W${w.num}</span><span>${mon}</span></div>`;
   });
   wkHtml += '</div>';
   let barsHtml = '';
@@ -578,8 +576,10 @@ function render() {
     let rowHtml = `<div class="bar-row" style="${bg}height:${ROW_H}px;" data-idx="${i}">`;
     visWeeks.forEach((w, wi) => {
       const overlap = ts <= w.end && te >= w.start;
+      const isCurr = _now >= w.start.getTime() && _now <= w.end.getTime();
       const cls = w.num === 1 ? 'bar-cell qtr-start' : 'bar-cell';
-      rowHtml += `<div class="${cls}" style="width:${CELL_W}px;min-width:${CELL_W}px;height:${ROW_H}px;">`;
+      const cellBg = isCurr ? 'background:rgba(46,90,138,0.10);' : '';
+      rowHtml += `<div class="${cls}" style="width:${CELL_W}px;min-width:${CELL_W}px;height:${ROW_H}px;${cellBg}">`;
       if (overlap) {
         const barStart = Math.max(ts.getTime(), w.start.getTime());
         const barEnd = Math.min(te.getTime(), w.end.getTime());
@@ -1127,10 +1127,13 @@ function renderPlan() {
   });
   hdrHtml += `</div>`;
   // Week row
+  const _planNow = Date.now();
   hdrHtml += `<div style="display:flex;margin-left:${labelW}px;">`;
   weeks.forEach(w => {
     const mon = w.start.toLocaleDateString('en-US', { month: 'short' });
-    hdrHtml += `<div style="width:${PLAN_CELL}px;min-width:${PLAN_CELL}px;box-sizing:border-box;background:#4472C4;color:white;text-align:center;font-size:8px;padding:2px 0;border-right:1px solid rgba(255,255,255,0.15);"><span style="font-weight:700;font-size:9px;">W${w.num}</span><br>${mon}</div>`;
+    const isCurr = _planNow >= w.start.getTime() && _planNow <= w.end.getTime();
+    const wkBg = isCurr ? '#2E5A8A' : '#4472C4';
+    hdrHtml += `<div style="width:${PLAN_CELL}px;min-width:${PLAN_CELL}px;box-sizing:border-box;background:${wkBg};color:white;text-align:center;font-size:8px;padding:2px 0;border-right:1px solid rgba(255,255,255,0.15);"><span style="font-weight:700;font-size:9px;">W${w.num}</span><br>${mon}</div>`;
   });
   hdrHtml += `</div></div>`;
 
@@ -1167,14 +1170,16 @@ function renderPlan() {
     <div class="plan-drop-indicator" id="planDropIndicator" style="margin-left:${labelW}px;"></div>
   </div>`;
 
-  // Current week indicator line
+  // Current week shading + indicator line
   const todayTime = new Date().getTime();
   let todayLineHtml = '';
   for (let i = 0; i < weeks.length; i++) {
     if (todayTime >= weeks[i].start.getTime() && todayTime <= weeks[i].end.getTime()) {
+      const colLeft = labelW + i * PLAN_CELL;
+      todayLineHtml = `<div style="position:absolute;left:${colLeft}px;top:0;bottom:0;width:${PLAN_CELL}px;background:rgba(46,90,138,0.10);z-index:1;pointer-events:none;"></div>`;
       const frac = (todayTime - weeks[i].start.getTime()) / (7 * 86400000);
       const todayX = labelW + i * PLAN_CELL + frac * PLAN_CELL;
-      todayLineHtml = `<div style="position:absolute;left:${todayX}px;top:0;bottom:0;width:2px;background:var(--red);z-index:8;pointer-events:none;">
+      todayLineHtml += `<div style="position:absolute;left:${todayX}px;top:0;bottom:0;width:2px;background:var(--red);z-index:8;pointer-events:none;">
         <div style="position:absolute;top:0;left:-20px;width:42px;text-align:center;background:var(--red);color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:0 0 4px 4px;">Today</div>
       </div>`;
       break;
