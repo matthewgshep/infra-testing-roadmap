@@ -186,7 +186,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 24, 2026 at 11:35 AM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 24, 2026 at 11:57 AM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -655,6 +655,7 @@ function renderActive() {
   render();
   if (view === 'scatter') renderScatter();
   if (view === 'list') renderList();
+  if (view === 'plan') renderPlan();
 }
 prodSel.addEventListener('change', renderActive);
 document.getElementById('statusFilter').addEventListener('change', renderActive);
@@ -923,9 +924,9 @@ const PLAN_ROW_H = 40;
 let plannedItems = []; // { id, name, product, startWeek, durationWeeks }
 
 function planGetQuarters() {
-  // Current quarter + 3 future quarters
+  // Current quarter + 4 future quarters (5 total)
   const today = new Date();
-  return QUARTERS.filter(q => new Date(q.end) >= today).slice(0, 4);
+  return QUARTERS.filter(q => new Date(q.end) >= today).slice(0, 5);
 }
 
 function planWeeks(quarters) {
@@ -951,9 +952,13 @@ function renderPlan() {
   const totalW = weeks.length * PLAN_CELL;
   const labelW = 180;
 
-  // Find existing tests that overlap this time range
+  // Product filter
+  const product = prodSel.value;
+
+  // Find existing tests that overlap this time range, filtered by product
   const rangeStart = weeks[0].start, rangeEnd = weeks[weeks.length - 1].end;
   const existing = TESTS.filter(t => {
+    if (product !== 'All' && t.product !== product) return false;
     const ts = new Date(t.start), te = new Date(t.end);
     return ts <= rangeEnd && te >= rangeStart;
   });
@@ -1009,10 +1014,12 @@ function renderPlan() {
 
   timeline.innerHTML = hdrHtml + lanesHtml;
 
-  // Render backlog sidebar
+  // Render backlog sidebar — filtered by product
   const placedNames = new Set(plannedItems.map(p => p.name));
+  const filteredBacklog = BACKLOG.filter(b => product === 'All' || b.product === product);
   let blHtml = '';
-  BACKLOG.forEach((b, bi) => {
+  filteredBacklog.forEach((b) => {
+    const bi = BACKLOG.indexOf(b);
     const placed = placedNames.has(b.name) ? ' placed' : '';
     blHtml += `<div class="plan-backlog-card${placed}" draggable="true" data-bl-idx="${bi}">
       <div class="pbc-product">${esc(b.product)}</div>
@@ -1020,7 +1027,8 @@ function renderPlan() {
     </div>`;
   });
   backlogList.innerHTML = blHtml;
-  backlogCount.textContent = `(${BACKLOG.length - placedNames.size})`;
+  const availableCount = filteredBacklog.filter(b => !placedNames.has(b.name)).length;
+  backlogCount.textContent = `(${availableCount})`;
 
   // ── Drag from backlog ──
   let dragGhost = null;
