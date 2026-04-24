@@ -186,7 +186,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 24, 2026 at 02:24 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 24, 2026 at 02:41 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -561,10 +561,11 @@ function render() {
   });
   fqHtml += '</div>';
   const _now = Date.now();
+  const _DAY_MS = 86400000;
   let wkHtml = '<div class="week-row">';
   visWeeks.forEach(w => {
     const mon = w.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const isCurr = _now >= w.start.getTime() && _now <= w.end.getTime();
+    const isCurr = _now >= w.start.getTime() && _now < w.end.getTime() + _DAY_MS;
     const wkBg = isCurr ? 'background:#2E5A8A;' : 'background:#4472C4;';
     wkHtml += `<div class="week-cell" style="width:${CELL_W}px;min-width:${CELL_W}px;${wkBg}"><span class="wk-num">W${w.num}</span><span>${mon}</span></div>`;
   });
@@ -576,7 +577,7 @@ function render() {
     let rowHtml = `<div class="bar-row" style="${bg}height:${ROW_H}px;" data-idx="${i}">`;
     visWeeks.forEach((w, wi) => {
       const overlap = ts <= w.end && te >= w.start;
-      const isCurr = _now >= w.start.getTime() && _now <= w.end.getTime();
+      const isCurr = _now >= w.start.getTime() && _now < w.end.getTime() + _DAY_MS;
       const cls = w.num === 1 ? 'bar-cell qtr-start' : 'bar-cell';
       const cellBg = isCurr ? 'background:rgba(46,90,138,0.10);' : '';
       rowHtml += `<div class="${cls}" style="width:${CELL_W}px;min-width:${CELL_W}px;height:${ROW_H}px;${cellBg}">`;
@@ -1128,10 +1129,11 @@ function renderPlan() {
   hdrHtml += `</div>`;
   // Week row
   const _planNow = Date.now();
+  const _PDAY = 86400000;
   hdrHtml += `<div style="display:flex;margin-left:${labelW}px;">`;
   weeks.forEach(w => {
     const mon = w.start.toLocaleDateString('en-US', { month: 'short' });
-    const isCurr = _planNow >= w.start.getTime() && _planNow <= w.end.getTime();
+    const isCurr = _planNow >= w.start.getTime() && _planNow < w.end.getTime() + _PDAY;
     const wkBg = isCurr ? '#2E5A8A' : '#4472C4';
     hdrHtml += `<div style="width:${PLAN_CELL}px;min-width:${PLAN_CELL}px;box-sizing:border-box;background:${wkBg};color:white;text-align:center;font-size:8px;padding:2px 0;border-right:1px solid rgba(255,255,255,0.15);"><span style="font-weight:700;font-size:9px;">W${w.num}</span><br>${mon}</div>`;
   });
@@ -1174,7 +1176,7 @@ function renderPlan() {
   const todayTime = new Date().getTime();
   let todayLineHtml = '';
   for (let i = 0; i < weeks.length; i++) {
-    if (todayTime >= weeks[i].start.getTime() && todayTime <= weeks[i].end.getTime()) {
+    if (todayTime >= weeks[i].start.getTime() && todayTime < weeks[i].end.getTime() + 86400000) {
       const colLeft = labelW + i * PLAN_CELL;
       todayLineHtml = `<div style="position:absolute;left:${colLeft}px;top:0;bottom:0;width:${PLAN_CELL}px;background:rgba(46,90,138,0.10);z-index:1;pointer-events:none;"></div>`;
       const frac = (todayTime - weeks[i].start.getTime()) / (7 * 86400000);
