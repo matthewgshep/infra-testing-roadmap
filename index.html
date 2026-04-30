@@ -189,7 +189,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 30, 2026 at 09:57 AM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 30, 2026 at 12:48 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -974,7 +974,7 @@ const BACKLOG = RAW_DATA.backlog || [];
 const AVG_DURATION = RAW_DATA.avgDuration || {};
 const PLAN_CELL = 50; // px per week
 const PLAN_ROW_H = 40;
-let plannedItems = []; // { id, name, product, startWeek, durationWeeks }
+let plannedItems = []; // { id, name, product, startOffset, duration, startDate }
 let _planLoaded = false;
 let _planDirty = false;
 const GH_REPO = 'matthewgshep/infra-testing-roadmap';
@@ -1001,24 +1001,33 @@ function planMarkDirty() {
 function planBuildPayload() {
   const quarters = planGetQuarters();
   const weeks = planWeeks(quarters);
-  return plannedItems.map(p => ({
-    name: p.name,
-    product: p.product,
-    startDate: p.startDate,
-    durationWeeks: p.durationWeeks,
-    fqWeek: weeks[p.startWeek] ? weeks[p.startWeek].fq + ' W' + weeks[p.startWeek].num : '',
-    endDate: weeks[Math.min(p.startWeek + p.durationWeeks - 1, weeks.length - 1)]
-      ? weeks[Math.min(p.startWeek + p.durationWeeks - 1, weeks.length - 1)].end.toISOString().slice(0, 10) : ''
-  }));
+  const timelineStart = weeks[0].start.getTime();
+  return plannedItems.map(p => {
+    const startMs = timelineStart + p.startOffset * 7 * 86400000;
+    const endMs = startMs + p.duration * 7 * 86400000;
+    const sd = new Date(startMs);
+    const ed = new Date(endMs);
+    // Find which FQ week the start falls in
+    const wi = Math.floor(p.startOffset);
+    const fqWeek = weeks[wi] ? weeks[wi].fq + ' W' + weeks[wi].num : '';
+    return {
+      name: p.name,
+      product: p.product,
+      startDate: sd.toISOString().slice(0, 10),
+      endDate: ed.toISOString().slice(0, 10),
+      durationWeeks: Math.round(p.duration * 10) / 10,
+      fqWeek: fqWeek
+    };
+  });
 }
 
-function planDateToWeekIdx(dateStr, weeks) {
+function planDateToOffset(dateStr, weeks) {
+  // Returns fractional week offset from timeline start, or -1 if outside range
   const d = new Date(dateStr).getTime();
-  for (let i = 0; i < weeks.length; i++) {
-    if (d >= weeks[i].start.getTime() && d <= weeks[i].end.getTime()) return i;
-    if (d < weeks[i].start.getTime()) return Math.max(0, i);
-  }
-  return -1; // outside visible range
+  const timelineStart = weeks[0].start.getTime();
+  const timelineEnd = weeks[weeks.length - 1].end.getTime() + 86400000;
+  if (d < timelineStart || d > timelineEnd) return -1;
+  return (d - timelineStart) / (7 * 86400000);
 }
 
 async function planLoadSaved() {
@@ -1033,14 +1042,20 @@ async function planLoadSaved() {
     const weeks = planWeeks(quarters);
     plannedItems = [];
     saved.forEach(s => {
-      const wi = planDateToWeekIdx(s.startDate, weeks);
-      if (wi < 0) return; // skip items outside visible range
+      const off = planDateToOffset(s.startDate, weeks);
+      if (off < 0) return; // skip items outside visible range
+      // Calculate duration from saved dates if both present, else use saved durationWeeks
+      let dur = s.durationWeeks || 4;
+      if (s.endDate && s.startDate) {
+        const daysDur = (new Date(s.endDate) - new Date(s.startDate)) / 86400000;
+        if (daysDur > 0) dur = daysDur / 7;
+      }
       plannedItems.push({
         id: Date.now() + Math.random(),
         name: s.name,
         product: s.product,
-        startWeek: wi,
-        durationWeeks: s.durationWeeks || 4,
+        startOffset: off,
+        duration: dur,
         startDate: s.startDate
       });
     });
@@ -1201,8 +1216,8 @@ function renderPlan() {
   });
   // Planned tests
   plannedItems.forEach((p, pi) => {
-    const barLeft = labelW + p.startWeek * PLAN_CELL;
-    const barWidth = p.durationWeeks * PLAN_CELL;
+    const barLeft = labelW + p.startOffset * PLAN_CELL;
+    const barWidth = p.duration * PLAN_CELL;
     lanesHtml += `<div class="plan-lane" style="height:${PLAN_ROW_H}px;min-width:${labelW + totalW}px;" data-plan-idx="${pi}">
       <div class="plan-lane-label" style="width:${labelW}px;">${esc(p.name.substring(0, 28))}</div>
       <div class="plan-bar planned" style="left:${barLeft}px;width:${barWidth}px;" data-plan-idx="${pi}">
@@ -1279,6 +1294,12 @@ function renderPlan() {
     });
   });
 
+  // Helper: convert fractional week offset to a calendar date
+  function offsetToDate(off) {
+    const totalDays = off * 7;
+    return new Date(weeks[0].start.getTime() + totalDays * 86400000);
+  }
+
   timeline.addEventListener('dragover', (e) => {
     e.preventDefault();
     if (!dragItem) return;
@@ -1286,14 +1307,14 @@ function renderPlan() {
       dragGhost.style.left = (e.clientX + 12) + 'px';
       dragGhost.style.top = (e.clientY + 12) + 'px';
     }
-    // Show drop indicator
+    // Show drop indicator at fractional position
     const rect = timeline.getBoundingClientRect();
     const x = e.clientX - rect.left + timeline.scrollLeft - labelW;
-    const weekIdx = Math.max(0, Math.min(weeks.length - 1, Math.floor(x / PLAN_CELL)));
+    const off = Math.max(0, Math.min(weeks.length - 1, x / PLAN_CELL));
     const ind = document.getElementById('planDropIndicator');
     if (ind) {
       ind.style.display = 'block';
-      ind.style.left = (labelW + weekIdx * PLAN_CELL) + 'px';
+      ind.style.left = (labelW + off * PLAN_CELL) + 'px';
       const indDur = dragItem ? (AVG_DURATION[dragItem.product] || 5) : 5;
       ind.style.width = (indDur * PLAN_CELL) + 'px';
     }
@@ -1305,14 +1326,17 @@ function renderPlan() {
     const rect = timeline.getBoundingClientRect();
     const x = e.clientX - rect.left + timeline.scrollLeft - labelW;
     const defDur = AVG_DURATION[dragItem.product] || 5;
-    const weekIdx = Math.max(0, Math.min(weeks.length - defDur, Math.floor(x / PLAN_CELL)));
+    // Snap to nearest day (1/7 of a week)
+    const daySnap = 1 / 7;
+    const rawOff = x / PLAN_CELL;
+    const off = Math.max(0, Math.min(weeks.length - defDur, Math.round(rawOff / daySnap) * daySnap));
     plannedItems.push({
       id: Date.now(),
       name: dragItem.name,
       product: dragItem.product,
-      startWeek: weekIdx,
-      durationWeeks: defDur,
-      startDate: weeks[weekIdx].start.toISOString().slice(0, 10),
+      startOffset: off,
+      duration: defDur,
+      startDate: offsetToDate(off).toISOString().slice(0, 10),
     });
     if (dragGhost) { dragGhost.remove(); dragGhost = null; }
     dragItem = null;
@@ -1334,33 +1358,34 @@ function renderPlan() {
     });
 
     // Resize handles
+    const daySnap = 1 / 7;
     bar.querySelectorAll('.plan-resize').forEach(handle => {
       handle.addEventListener('mousedown', (e) => {
         e.stopPropagation();
         e.preventDefault();
         const edge = handle.dataset.edge;
         const startX = e.clientX;
-        const origStart = item.startWeek;
-        const origDur = item.durationWeeks;
+        const origStart = item.startOffset;
+        const origDur = item.duration;
 
         function onMove(ev) {
           const dx = ev.clientX - startX;
-          const dWeeks = Math.round(dx / PLAN_CELL);
+          const dOff = Math.round((dx / PLAN_CELL) / daySnap) * daySnap;
           if (edge === 'right') {
-            item.durationWeeks = Math.max(1, origDur + dWeeks);
+            item.duration = Math.max(daySnap, origDur + dOff);
           } else {
-            const newStart = Math.max(0, origStart + dWeeks);
+            const newStart = Math.max(0, origStart + dOff);
             const diff = newStart - origStart;
-            item.startWeek = newStart;
-            item.durationWeeks = Math.max(1, origDur - diff);
+            item.startOffset = newStart;
+            item.duration = Math.max(daySnap, origDur - diff);
           }
-          bar.style.left = (labelW + item.startWeek * PLAN_CELL) + 'px';
-          bar.style.width = (item.durationWeeks * PLAN_CELL) + 'px';
+          bar.style.left = (labelW + item.startOffset * PLAN_CELL) + 'px';
+          bar.style.width = (item.duration * PLAN_CELL) + 'px';
         }
         function onUp() {
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
-          item.startDate = weeks[Math.min(item.startWeek, weeks.length - 1)].start.toISOString().slice(0, 10);
+          item.startDate = offsetToDate(item.startOffset).toISOString().slice(0, 10);
           renderPlan();
           planMarkDirty();
         }
@@ -1374,18 +1399,18 @@ function renderPlan() {
       if (e.target.classList.contains('plan-resize') || e.target.classList.contains('plan-remove')) return;
       e.preventDefault();
       const startX = e.clientX;
-      const origStart = item.startWeek;
+      const origStart = item.startOffset;
 
       function onMove(ev) {
         const dx = ev.clientX - startX;
-        const dWeeks = Math.round(dx / PLAN_CELL);
-        item.startWeek = Math.max(0, Math.min(weeks.length - item.durationWeeks, origStart + dWeeks));
-        bar.style.left = (labelW + item.startWeek * PLAN_CELL) + 'px';
+        const dOff = Math.round((dx / PLAN_CELL) / daySnap) * daySnap;
+        item.startOffset = Math.max(0, Math.min(weeks.length - item.duration, origStart + dOff));
+        bar.style.left = (labelW + item.startOffset * PLAN_CELL) + 'px';
       }
       function onUp() {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        item.startDate = weeks[Math.min(item.startWeek, weeks.length - 1)].start.toISOString().slice(0, 10);
+        item.startDate = offsetToDate(item.startOffset).toISOString().slice(0, 10);
         renderPlan();
         planMarkDirty();
       }
@@ -1419,16 +1444,7 @@ function planClearAll() {
 }
 
 function planExport() {
-  const quarters = planGetQuarters();
-  const weeks = planWeeks(quarters);
-  const plan = plannedItems.map(p => ({
-    name: p.name,
-    product: p.product,
-    startDate: p.startDate,
-    startWeek: weeks[p.startWeek] ? weeks[p.startWeek].fq + ' W' + weeks[p.startWeek].num : '',
-    durationWeeks: p.durationWeeks,
-    endDate: weeks[Math.min(p.startWeek + p.durationWeeks - 1, weeks.length - 1)] ? weeks[Math.min(p.startWeek + p.durationWeeks - 1, weeks.length - 1)].end.toISOString().slice(0, 10) : ''
-  }));
+  const plan = planBuildPayload();
   const blob = new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
