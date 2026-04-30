@@ -33,7 +33,7 @@
   .left-panel { flex-shrink: 0; overflow-y: auto; border-right: 2px solid var(--border); background: var(--surface); height: 100%; }
   .left-panel::-webkit-scrollbar { display: none; }
   .left-header { display: grid; grid-template-columns: 130px 1fr 105px; position: sticky; top: 0; z-index: 10; }
-  .left-header > div { padding: 8px 8px; font-size: 11px; font-weight: 600; color: white; background: var(--blue-dark); border-bottom: 1px solid var(--border); border-right: 1px solid rgba(255,255,255,0.1); white-space: nowrap; }
+  .left-header > div { padding: 8px 8px; font-size: 11px; font-weight: 600; color: white; background: var(--blue-dark); border-right: 1px solid rgba(255,255,255,0.1); white-space: nowrap; display:flex; align-items:center; }
   .left-row { display: grid; grid-template-columns: 130px 1fr 105px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
   .left-row:hover { background: var(--blue-light) !important; }
   .left-row > div { padding: 4px 8px; font-size: 11px; overflow: hidden; text-overflow: ellipsis; border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center; }
@@ -189,7 +189,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 30, 2026 at 07:56 AM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 30, 2026 at 09:57 AM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -649,6 +649,18 @@ function render() {
     }
   }
   rp.innerHTML = `<div class="timeline-header">${fqHtml}${wkHtml}</div><div style="position:relative;">${barsHtml}${ganttTodayHtml}</div>`;
+  // Sync header heights so rows align
+  requestAnimationFrame(() => {
+    const rpHdr = rp.querySelector('.timeline-header');
+    const lpHdr = lp.querySelector('.left-header');
+    if (rpHdr && lpHdr) {
+      const rpH = rpHdr.offsetHeight;
+      const lpH = lpHdr.offsetHeight;
+      const maxH = Math.max(rpH, lpH);
+      lpHdr.style.height = maxH + 'px';
+      rpHdr.style.height = maxH + 'px';
+    }
+  });
   lp.onscroll = () => { rp.scrollTop = lp.scrollTop; };
   rp.onscroll = () => { lp.scrollTop = rp.scrollTop; };
   // Click to expand/collapse detail rows
