@@ -189,7 +189,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 30, 2026 at 12:48 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Apr 30, 2026 at 06:55 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -1357,8 +1357,41 @@ function renderPlan() {
       planMarkDirty();
     });
 
-    // Resize handles
+    // Guide line + date label helpers
     const daySnap = 1 / 7;
+    const lanesContainer = timeline.querySelector('div[style*="position:relative"]') || timeline;
+    function showGuide(offsetWeeks, edge) {
+      let guide = document.getElementById('planGuide');
+      let label = document.getElementById('planGuideLabel');
+      if (!guide) {
+        guide = document.createElement('div');
+        guide.id = 'planGuide';
+        guide.style.cssText = 'position:absolute;top:0;bottom:0;width:1px;border-left:2px dashed var(--blue);z-index:20;pointer-events:none;transition:left 0.05s;';
+        lanesContainer.appendChild(guide);
+      }
+      if (!label) {
+        label = document.createElement('div');
+        label.id = 'planGuideLabel';
+        label.style.cssText = 'position:absolute;top:-22px;transform:translateX(-50%);background:var(--blue-dark);color:white;font-size:10px;font-weight:600;padding:2px 8px;border-radius:3px;white-space:nowrap;z-index:21;pointer-events:none;';
+        lanesContainer.appendChild(label);
+      }
+      const px = labelW + offsetWeeks * PLAN_CELL;
+      guide.style.left = px + 'px';
+      guide.style.display = 'block';
+      const d = offsetToDate(offsetWeeks);
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+      label.textContent = dayName + ' ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      label.style.left = px + 'px';
+      label.style.display = 'block';
+    }
+    function hideGuide() {
+      const g = document.getElementById('planGuide');
+      const l = document.getElementById('planGuideLabel');
+      if (g) g.style.display = 'none';
+      if (l) l.style.display = 'none';
+    }
+
+    // Resize handles
     bar.querySelectorAll('.plan-resize').forEach(handle => {
       handle.addEventListener('mousedown', (e) => {
         e.stopPropagation();
@@ -1381,10 +1414,14 @@ function renderPlan() {
           }
           bar.style.left = (labelW + item.startOffset * PLAN_CELL) + 'px';
           bar.style.width = (item.duration * PLAN_CELL) + 'px';
+          // Show guide at the edge being dragged
+          const edgeOff = edge === 'right' ? item.startOffset + item.duration : item.startOffset;
+          showGuide(edgeOff, edge);
         }
         function onUp() {
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
+          hideGuide();
           item.startDate = offsetToDate(item.startOffset).toISOString().slice(0, 10);
           renderPlan();
           planMarkDirty();
@@ -1394,7 +1431,7 @@ function renderPlan() {
       });
     });
 
-    // Drag to move
+    // Drag to move — show guides at both edges
     bar.addEventListener('mousedown', (e) => {
       if (e.target.classList.contains('plan-resize') || e.target.classList.contains('plan-remove')) return;
       e.preventDefault();
@@ -1406,10 +1443,12 @@ function renderPlan() {
         const dOff = Math.round((dx / PLAN_CELL) / daySnap) * daySnap;
         item.startOffset = Math.max(0, Math.min(weeks.length - item.duration, origStart + dOff));
         bar.style.left = (labelW + item.startOffset * PLAN_CELL) + 'px';
+        showGuide(item.startOffset, 'left');
       }
       function onUp() {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
+        hideGuide();
         item.startDate = offsetToDate(item.startOffset).toISOString().slice(0, 10);
         renderPlan();
         planMarkDirty();
