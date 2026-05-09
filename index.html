@@ -100,8 +100,9 @@
   .metric-detail-card .mdc-val.pos { color: var(--green); }
   .metric-detail-card .mdc-val.neg { color: var(--red); }
   .metric-detail-card .mdc-val.neutral { color: var(--text-muted); }
-  .metric-detail-card .mdc-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; position: relative; }
-  .metric-detail-card .mdc-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; }
+  .metric-detail-card .mdc-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; position: relative; }
+  .metric-detail-card .mdc-fill { position: absolute; top: 0; bottom: 0; border-radius: 0; }
+  .metric-detail-card .mdc-median { position: absolute; top: -2px; bottom: -2px; width: 2px; left: 50%; transform: translateX(-1px); background: var(--text-muted); z-index: 2; border-radius: 1px; }
   .metric-detail-card .mdc-compare { font-size: 9px; color: var(--text-muted); margin-top: 3px; }
   .detail-actions { display: flex; gap: 6px; margin-bottom: 8px; }
   .detail-actions button { padding: 4px 10px; font-size: 10px; font-weight: 600; border: 1px solid var(--border); border-radius: 4px; background: white; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.15s; }
@@ -207,7 +208,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated May 09, 2026 at 09:46 AM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated May 09, 2026 at 11:22 AM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -240,6 +241,14 @@
 </div>
 </div>
 <div class="view-panel" id="scatterView">
+  <div style="padding:6px 12px;display:flex;align-items:center;gap:8px;background:var(--surface);border-bottom:1px solid var(--border);">
+    <label style="font-size:11px;font-weight:600;color:var(--text-muted);">Metric</label>
+    <select id="scatterMetric" style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:white;">
+      <option value="gnarr">GNARR Lift</option>
+      <option value="ctr">CTR</option>
+      <option value="units_pct">Units %</option>
+    </select>
+  </div>
   <div class="scatter-container" id="scatterContainer">
     <svg class="scatter-svg" id="scatterSvg"></svg>
   </div>
@@ -562,26 +571,38 @@ Object.keys(_gMedians).forEach(prod => {
 });
 function buildMetricCard(label, key, val, product, isCurrency) {
   const pm = gProductMedians[product] || {};
-  const mx = gProductMaxes[product] || {};
   const med = pm[key];
-  const maxVal = mx[key] || 1;
-  if (val === null) return `<div class="metric-detail-card"><div class="mdc-top"><span class="mdc-label">${label}</span><span class="mdc-val neutral">\u2014</span></div><div class="mdc-bar"><div class="mdc-fill" style="width:0%;background:var(--text-muted);"></div></div><div class="mdc-compare">No data</div></div>`;
+  // No data
+  if (val === null) return `<div class="metric-detail-card"><div class="mdc-top"><span class="mdc-label">${label}</span><span class="mdc-val neutral">\u2014</span></div><div class="mdc-bar"><div class="mdc-median"></div></div><div class="mdc-compare">No data</div></div>`;
   const cls = val > 0 ? 'pos' : val < 0 ? 'neg' : 'neutral';
   const display = isCurrency ? fmtDollar(val) : fmtPct(val);
-  const barColor = val > 0 ? 'var(--green)' : val < 0 ? 'var(--red)' : 'var(--text-muted)';
-  const barW = Math.min(100, Math.round((Math.abs(val) / maxVal) * 100));
+  // Diverging bar: median at center (50%), bar extends left or right
+  let barHtml = '<div class="mdc-median"></div>';
   let compare = '';
   if (med !== null && med !== undefined) {
+    const diff = val - med;
+    // Scale using 75th percentile of deviations so most bars are clearly visible
+    const allVals = (_gMedians[product] && _gMedians[product][key]) || [];
+    const devs = allVals.map(v => Math.abs(v - med)).sort((a, b) => a - b);
+    const p75idx = Math.floor(devs.length * 0.75);
+    const scaleDev = devs[p75idx] || devs[devs.length - 1] || 1;
+    const pct = Math.min(50, Math.round((Math.abs(diff) / scaleDev) * 40));
+    const barColor = diff > 0 ? 'var(--green)' : diff < 0 ? 'var(--red)' : 'var(--text-muted)';
+    if (diff > 0) {
+      barHtml += `<div class="mdc-fill" style="left:50%;width:${pct}%;background:${barColor};"></div>`;
+    } else if (diff < 0) {
+      barHtml += `<div class="mdc-fill" style="right:50%;width:${pct}%;background:${barColor};"></div>`;
+    }
     if (med === 0) {
       compare = isCurrency ? 'Median: $0' : 'Median: 0.00%';
     } else {
-      const diff = ((val - med) / Math.abs(med)) * 100;
-      const sign = diff > 0 ? '+' : '';
-      const arrow = diff > 0 ? '\u25B2' : diff < 0 ? '\u25BC' : '';
-      compare = `${arrow} ${sign}${Math.round(diff)}% vs median`;
+      const pctDiff = ((val - med) / Math.abs(med)) * 100;
+      const sign = pctDiff > 0 ? '+' : '';
+      const arrow = pctDiff > 0 ? '\u25B2' : pctDiff < 0 ? '\u25BC' : '';
+      compare = `${arrow} ${sign}${Math.round(pctDiff)}% vs median (${isCurrency ? fmtDollar(med) : fmtPct(med)})`;
     }
   }
-  return `<div class="metric-detail-card"><div class="mdc-top"><span class="mdc-label">${label}</span><span class="mdc-val ${cls}">${display}</span></div><div class="mdc-bar"><div class="mdc-fill" style="width:${barW}%;background:${barColor};"></div></div><div class="mdc-compare">${compare}</div></div>`;
+  return `<div class="metric-detail-card"><div class="mdc-top"><span class="mdc-label">${label}</span><span class="mdc-val ${cls}">${display}</span></div><div class="mdc-bar">${barHtml}</div><div class="mdc-compare">${compare}</div></div>`;
 }
 function copyExperiment(idx) {
   const t = TESTS[idx];
@@ -857,6 +878,7 @@ function renderActive() {
 prodSel.addEventListener('change', renderActive);
 document.getElementById('statusFilter').addEventListener('change', renderActive);
 document.getElementById('searchInput').addEventListener('input', renderActive);
+document.getElementById('scatterMetric').addEventListener('change', renderScatter);
 document.getElementById('zoomSlider').addEventListener('input', (e) => { CELL_W = parseInt(e.target.value); render(); });
 // First render to establish DOM layout, then measure right panel and fit 13 weeks
 render();
@@ -987,6 +1009,9 @@ function renderScatter() {
     requestAnimationFrame(renderScatter);
     return;
   }
+  const scatterMetric = document.getElementById('scatterMetric').value;
+  const metricLabels = { gnarr: 'GNARR Lift', ctr: 'CTR', units_pct: 'Units' };
+  const metricLabel = metricLabels[scatterMetric] || 'Lift';
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   const pad = { top: 40, right: 40, bottom: 60, left: 70 };
@@ -1001,7 +1026,7 @@ function renderScatter() {
   const status = document.getElementById('statusFilter').value;
   const search = document.getElementById('searchInput').value.toLowerCase();
   const filtered = TESTS.filter(t => {
-    if (t.gnarr === null || t.status !== 'Complete') return false;
+    if (t[scatterMetric] === null || t.status !== 'Complete') return false;
     const te = new Date(t.end);
     if (te < windowStart || te > windowEnd) return false;
     if (product !== 'All' && t.product !== product) return false;
@@ -1009,13 +1034,13 @@ function renderScatter() {
     if (search && !t.name.toLowerCase().includes(search)) return false;
     return true;
   });
-  if (filtered.length === 0) { svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#718096" font-size="14">No tests with GNARR data in the last 24 months</text>'; return; }
+  if (filtered.length === 0) { svg.innerHTML = `<text x="50%" y="50%" text-anchor="middle" fill="#718096" font-size="14">No tests with ${metricLabel} data in the last 24 months</text>`; return; }
   // Fixed X-axis: windowStart to windowEnd (24 months)
   const minDate = windowStart.getTime();
   const maxDate = windowEnd.getTime();
   const dateRange = maxDate - minDate;
   // Y-axis from data
-  const lifts = filtered.map(t => t.gnarr * 100);
+  const lifts = filtered.map(t => t[scatterMetric] * 100);
   const maxLift = Math.ceil(Math.max(...lifts, 1));
   const minLift = Math.floor(Math.min(...lifts, -1));
   const liftRange = maxLift - minLift || 1;
@@ -1058,7 +1083,7 @@ function renderScatter() {
   }
   // Axis labels
   html += `<text x="${pad.left + plotW / 2}" y="${H - 5}" text-anchor="middle" class="scatter-axis-label">Test End Date</text>`;
-  html += `<text x="15" y="${pad.top + plotH / 2}" text-anchor="middle" class="scatter-axis-label" transform="rotate(-90,15,${pad.top + plotH / 2})">GNARR Lift %</text>`;
+  html += `<text x="15" y="${pad.top + plotH / 2}" text-anchor="middle" class="scatter-axis-label" transform="rotate(-90,15,${pad.top + plotH / 2})">${metricLabel} %</text>`;
   // Avg dashed line
   const avgY = yPos(avg);
   html += `<line x1="${pad.left}" y1="${avgY}" x2="${pad.left + plotW}" y2="${avgY}" stroke="#2E75B6" stroke-width="1.5" class="scatter-avg-line"/>`;
@@ -1068,7 +1093,7 @@ function renderScatter() {
   // Dots
   filtered.forEach((t, i) => {
     const endDate = new Date(t.end).getTime();
-    const lift = t.gnarr * 100;
+    const lift = t[scatterMetric] * 100;
     const x = xPos(endDate);
     const y = yPos(lift);
     const fill = dotFill(lift);
