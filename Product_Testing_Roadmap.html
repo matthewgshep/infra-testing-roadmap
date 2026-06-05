@@ -357,6 +357,10 @@ const TESTS = RAW_DATA.tests;
 const ALL_QUARTERS = RAW_DATA.quarters;
 const QUARTERS = ALL_QUARTERS.filter(q => {
   const qStart = new Date(q.start), qEnd = new Date(q.end);
+  // Always include the current quarter even if it has no tests yet
+  const today = new Date();
+  if (today >= qStart && today <= qEnd) return true;
+  // Include any quarter that has overlapping tests
   return TESTS.some(t => {
     const ts = new Date(t.start), te = new Date(t.end);
     return ts <= qEnd && te >= qStart;

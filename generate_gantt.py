@@ -37,6 +37,7 @@ except ImportError:
     sys.exit(1)
 
 # ── Adobe fiscal year start dates (Saturday nearest Dec 1) ──────────────
+# Auto-extends 3 fiscal years past today so new quarters appear automatically.
 FY_STARTS = {
     2023: datetime(2022, 12, 3),
     2024: datetime(2023, 12, 2),
@@ -44,6 +45,17 @@ FY_STARTS = {
     2026: datetime(2025, 11, 29),
     2027: datetime(2026, 11, 28),
 }
+
+def _extend_fy_starts():
+    """Auto-extend FY_STARTS to cover at least 3 fiscal years past today using a
+    52-week (364-day) rolling extension. Adobe occasionally has 53-week fiscal
+    years for calendar alignment; revisit and correct manually every ~5 years."""
+    target_fy = datetime.now().year + 3
+    while max(FY_STARTS.keys()) < target_fy:
+        last_fy = max(FY_STARTS.keys())
+        FY_STARTS[last_fy + 1] = FY_STARTS[last_fy] + timedelta(days=364)
+
+_extend_fy_starts()
 
 
 def fiscal_info(dt):
@@ -519,6 +531,9 @@ const TESTS = RAW_DATA.tests;
 const ALL_QUARTERS = RAW_DATA.quarters;
 const QUARTERS = ALL_QUARTERS.filter(q => {{
   const qStart = new Date(q.start), qEnd = new Date(q.end);
+  // Always include the current quarter even if it has no tests yet
+  const today = new Date();
+  if (today >= qStart && today <= qEnd) return true;
   return TESTS.some(t => {{
     const ts = new Date(t.start), te = new Date(t.end);
     return ts <= qEnd && te >= qStart;
