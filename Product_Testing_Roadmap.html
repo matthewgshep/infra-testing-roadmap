@@ -260,8 +260,8 @@
   .surface-btn { padding: 4px 10px; border: none; background: transparent; border-radius: 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
   .surface-btn:hover { background: rgba(255,255,255,0.6); color: var(--text); }
   .surface-btn.active { background: white; color: var(--blue-dark); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
-  .surface-btn[data-val="Acrobat Reader"].active { color: #1d4ed8; }
-  .surface-btn[data-val="Acrobat Reduced Mode"].active { color: #7c3aed; }
+  .surface-btn[data-val="Reader"].active { color: #1d4ed8; }
+  .surface-btn[data-val="Reduced Mode"].active { color: #7c3aed; }
 
 </style>
 </head>
@@ -277,8 +277,8 @@
     <label>Surface</label>
     <div class="surface-toggle" id="surfaceToggle">
       <button class="surface-btn active" data-val="All">Both</button>
-      <button class="surface-btn" data-val="Acrobat Reader">Reader</button>
-      <button class="surface-btn" data-val="Acrobat Reduced Mode">Reduced Mode</button>
+      <button class="surface-btn" data-val="Reader">Reader</button>
+      <button class="surface-btn" data-val="Reduced Mode">Reduced Mode</button>
     </div>
     <select id="productFilter" style="display:none;"><option value="All">All Products</option></select>
     <label>Status</label>
