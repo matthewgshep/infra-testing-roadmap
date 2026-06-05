@@ -56,10 +56,12 @@ There are no tests or linters. Verify changes by regenerating the HTML and openi
 
 `extract_data()` reads the workbook; `generate_html()` is one giant f-string that emits a fully self-contained HTML file (inline CSS + JS, data injected as a `RAW_DATA` JSON blob). Because it's an f-string, **all literal `{` and `}` in the embedded CSS/JS must be doubled (`{{` `}}`)** — this is the single easiest thing to break when editing the HTML/JS.
 
-The emitted page has three tabs:
-1. **Results Roadmap** — the Gantt of completed/running/scheduled tests.
-2. **Planning Roadmap** — a drag-and-drop planner. Persists to `plan.json` in the GitHub repo via the **GitHub Contents API called directly from the browser**, using a PAT stored in `localStorage` (`gh_plan_token`). When run with `--serve`, planning instead POSTs to `/save-plan`, which writes a `Planning` sheet back into the Excel file (`save_plan_to_excel`).
-3. **Import Results** — drag screenshots in; calls the **Anthropic API directly from the browser** (`anthropic-dangerous-direct-browser-access`), key in `localStorage` (`anthropic_import_key`), to extract result rows for pasting into Excel.
+The emitted page's main tabs:
+- **Results Roadmap** — the Gantt of completed/running/scheduled tests.
+- **Experiment Lift** / **Experiment List** / **Velocity** — analysis views over the same `Results` data.
+- **Planning Roadmap** — a drag-and-drop planner. Persists to `plan.json` in the GitHub repo via the **GitHub Contents API called directly from the browser**, using a PAT stored in `localStorage` (`gh_plan_token`). When run with `--serve`, planning instead POSTs to `/save-plan`, which writes a `Planning` sheet back into the Excel file (`save_plan_to_excel`).
+
+Screenshot → Results import is handled **locally only**, via `import_results.py` (server-side Claude vision → appends to the Excel `Results` sheet). There used to be an in-browser "Import Results" tab that called the Anthropic API directly from the page; it was removed — do not reintroduce browser-side API calls.
 
 ### Excel `Results` sheet column layout (1-indexed, header row 1)
 Both `generate_gantt.py` and `import_results.py` hard-code these positions — keep them in sync:
@@ -85,4 +87,4 @@ Status is derived, not stored: no end date + start in future → **Scheduled**; 
 - `plan.json` lives in both checkouts and is committed alongside `index.html` on deploy; it's the planning persistence file, not config.
 - `generate_gantt.py` is currently untracked in this repo's git.
 - `~$...xlsx` is an Excel lock file — ignore it. Editing the workbook in Excel while a script reads it can cause inconsistent reads.
-- Embedded model IDs are pinned in source: `import_results.py` uses `claude-opus-4-5`; the browser Import tab uses `claude-sonnet-4-20250514`. Update both if migrating models.
+- Model ID is pinned in source: `import_results.py` uses `claude-opus-4-5`. Update it if migrating models.
