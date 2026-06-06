@@ -7,8 +7,8 @@ Product_Testing_Roadmap.html
 index.html
 plan.json
 
-# Screenshot ingestion staging for import_results.py (images + processed/)
-screenshots/
+# Result ingestion data for import_results.py — screenshots + per-experiment .xlsx + processed/
+results/
 
 # macOS / Excel cruft
 .DS_Store

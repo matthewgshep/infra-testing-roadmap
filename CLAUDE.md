@@ -42,10 +42,10 @@ python generate_gantt.py --deploy
 # Generate + run a local server with live Planning-Roadmap auto-save back to Excel
 python generate_gantt.py --serve            # opens http://localhost:8060
 
-# Import experiment screenshots → append rows to the Results sheet (server-side, via Claude vision)
+# Import experiment screenshots → append rows to the Results sheet (Claude vision + xlsx enrichment)
 export ANTHROPIC_API_KEY=sk-ant-...
-python import_results.py --folder ~/Desktop/screenshots
-python import_results.py --dry-run          # extract + print, don't write Excel
+python import_results.py                     # default: the results/ folder
+python import_results.py --dry-run          # extract + enrich + print, don't write Excel
 
 # Auto-deploy on every Excel save (filewatcher)
 python watch_and_deploy.py                  # foreground; writes ~/.gantt-watcher.pid
@@ -85,16 +85,20 @@ Status is derived, not stored: no end date + start in future → **Scheduled**; 
 
 ## Ingesting result screenshots
 
-Result dashboards are captured as screenshots and turned into `Results` rows. Staging folder is `screenshots/` (gitignored); processed images are moved to `screenshots/processed/`. Two ways to extract — same target, same columns:
+Result dashboards are captured as screenshots and turned into `Results` rows. The staging folder is **`results/`** (gitignored) and holds **both** the screenshots **and** the per-experiment workbooks (`RGSxxxx - … .xlsx`); processed images are moved to `results/processed/`.
 
-**A. In-session (preferred; no API key, no extra billing).** Claude Code reads the image directly with the Read tool and writes the row via a short `openpyxl` snippet. This is the right path when there's no `ANTHROPIC_API_KEY` (a Claude.ai/Claude Code subscription does **not** grant API access). Hard-won practices, in order:
+**The key idea: cross-reference each screenshot to its RGS workbook.** A screenshot only shows summary metrics and the bare RGS id. The matching `RGSxxxx.xlsx` in `results/` supplies what the screenshot lacks — the **full test name + date range** (the summary tab's title cell) and exact **QGNARR/metrics** (the "Overall - Orders & ARR Scaled" block: `Units` and `Gross New ARR` rows → Control/Challenger/Lift%). Match on the **RGS id** found in the workbook's filename. The summary tab is named inconsistently (`Final Summary` / `Overall Summary` / `Summary`). Helpers live in `import_results.py`: `find_excel_for_rgs`, `read_excel_summary`, `enrich_from_excel` (excel is authoritative over screenshot OCR). **QGNARR mapping is a best guess** (Challenger Gross-New-ARR dollar figure) — verify against intent.
+
+Two ways to extract — same target, same columns, same enrichment:
+
+**A. In-session (preferred; no API key, no extra billing).** Claude Code reads the image with the Read tool, then enriches from the matching workbook (reuse the `import_results.py` helpers via a snippet) and writes the row via `openpyxl`. This is the right path when there's no `ANTHROPIC_API_KEY` (a Claude.ai/Claude Code subscription does **not** grant API access). Hard-won practices, in order:
 1. **Close the workbook in Excel first**, then **back it up** — `openpyxl` rewrites the whole `.xlsx` on save and can drop charts/images on the `Gantt` sheet. Check for a `~$…xlsx` lock file to confirm Excel is closed; delete the backup only after verifying the result.
-2. **Don't trust the product field** — dashboards often don't say Reader vs Reduced Mode. Infer from an existing row for that RGS id, or ask; never just default it.
-3. **Check for an existing row by RGS id before writing.** The same RGS id may already exist (a different surface, or an interim/partial row). If so, **update that row** rather than appending — and **confirm with the user before overwriting existing metrics** (e.g. interim → baked numbers). The exact full test name often isn't on the dashboard (only the RGS id is), so match on the id, not the name.
+2. **Don't trust the product field** — dashboards often don't say Reader vs Reduced Mode. Infer from the matched workbook / an existing row for that RGS id, or ask; never just default it.
+3. **Check for an existing row by RGS id before writing.** The same RGS id may already exist (a different surface, or an interim/partial row). If so, **update that row** rather than appending — and **confirm with the user before overwriting existing metrics** (e.g. interim → baked numbers).
 4. Write per the **real sheet headers** (table above), set the same number formats as neighboring rows (`mm-dd-yy` dates, `0.00%` lifts), and **highlight new/updated rows yellow** (`PatternFill('solid', fgColor='FFFDE7')`) for review.
-5. Move the screenshot to `screenshots/processed/`, then regenerate + `--deploy`.
+5. Rename the screenshot to the full test name and move it to `results/processed/`, then regenerate + `--deploy`.
 
-**B. Scripted (`import_results.py`; needs `ANTHROPIC_API_KEY`).** Automates the same extraction for batches via Claude vision, appends new rows, dedups on `(RGS id, product)`, and moves images to `processed/`. Use `--dry-run` to preview without writing. Note the venv is Python 3.9, so the script relies on `from __future__ import annotations` for its `X | None` type hints.
+**B. Scripted (`import_results.py`; needs `ANTHROPIC_API_KEY`).** Automates the same flow for batches: Claude vision extract → `enrich_from_excel` → append new rows (dedup on `(RGS id, product)`) → rename each processed image to its full test name in `results/processed/`. Use `--dry-run` to preview (extraction + enrichment, no write). Note the venv is Python 3.9, so the script relies on `from __future__ import annotations` for its `X | None` type hints.
 
 ## Gotchas
 
