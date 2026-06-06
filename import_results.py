@@ -32,11 +32,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-try:
-    import anthropic
-except ImportError:
-    print("ERROR: anthropic package required. Run: pip install anthropic")
-    sys.exit(1)
+# `anthropic` is imported lazily in main() (only the vision call needs it) so this
+# module's Excel/RGS helpers can be reused — e.g. by jira_sync.py — without the package.
 
 try:
     from openpyxl import load_workbook
@@ -303,6 +300,11 @@ def main():
         print(f"ERROR: Excel file not found: {excel}")
         sys.exit(1)
 
+    try:
+        import anthropic
+    except ImportError:
+        print("ERROR: anthropic package required. Run: pip install anthropic")
+        sys.exit(1)
     client = anthropic.Anthropic(api_key=args.api_key)
 
     # Extract from all screenshots

@@ -47,6 +47,12 @@ export ANTHROPIC_API_KEY=sk-ant-...
 python import_results.py                     # default: the results/ folder
 python import_results.py --dry-run          # extract + enrich + print, don't write Excel
 
+# Seed running experiments from Jira → Results sheet (product, test name, start date only)
+export JIRA_BASE_URL=...                      # + JIRA_PAT (Server/DC) or JIRA_EMAIL/JIRA_API_TOKEN (Cloud)
+python jira_sync.py --list-fields            # discover custom field ids (e.g. the start-date field)
+python jira_sync.py --dry-run                # show what would be added, write nothing
+python jira_sync.py                          # append new running experiments (dedup on RGS id + product)
+
 # Auto-deploy on every Excel save (filewatcher)
 python watch_and_deploy.py                  # foreground; writes ~/.gantt-watcher.pid
 kill $(cat ~/.gantt-watcher.pid)            # stop it
@@ -99,6 +105,10 @@ Two ways to extract — same target, same columns, same enrichment:
 5. Rename the screenshot to the full test name and move it to `results/processed/`, then regenerate + `--deploy`.
 
 **B. Scripted (`import_results.py`; needs `ANTHROPIC_API_KEY`).** Automates the same flow for batches: Claude vision extract → `enrich_from_excel` → append new rows (dedup on `(RGS id, product)`) → rename each processed image to its full test name in `results/processed/`. Use `--dry-run` to preview (extraction + enrichment, no write). Note the venv is Python 3.9, so the script relies on `from __future__ import annotations` for its `X | None` type hints.
+
+## Seeding running experiments from Jira (`jira_sync.py`)
+
+Populates the Results sheet with experiments that are *running* in Jira, so they appear on the roadmap before any results exist — writing **product, test name, start date only** (metrics/winner/end-date stay blank for later screenshot ingestion). No Jira MCP is connected, so it uses the **Jira REST API** with a token (env vars: `JIRA_BASE_URL` + either `JIRA_PAT` for Server/DC or `JIRA_EMAIL`/`JIRA_API_TOKEN` for Cloud). Config (JQL, which field is the start date, product-detection rules) is env-var/CONFIG-block driven; `--list-fields` dumps a sample issue's field ids to find custom fields. Dedups on `(RGS id, product)` via the shared `import_results` helpers, appends new rows highlighted yellow. Dependency-free (stdlib `urllib`). Meant to run manually and on a schedule.
 
 ## Gotchas
 
