@@ -498,7 +498,16 @@ QUARTERS.forEach(q => {{
     WEEKS.push({{ start: ws, end: we, num: w + 1, fq: q.label }});
   }}
 }});
-const fqSet = [...new Set(TESTS.map(t => t.fq))].reverse();
+// Quarters offered in the filter: any quarter that has tests, plus the current and
+// next quarter — so as one quarter ends, the next is already available for tests that
+// run into it. Ordered newest-first by the fiscal calendar.
+const _now = new Date();
+const _curQ = ALL_QUARTERS.find(q => _now >= new Date(q.start) && _now <= new Date(q.end));
+const _curIdx = _curQ ? ALL_QUARTERS.indexOf(_curQ) : -1;
+const _offeredFQ = new Set(TESTS.map(t => t.fq));
+if (_curQ) _offeredFQ.add(_curQ.label);
+if (_curIdx >= 0 && ALL_QUARTERS[_curIdx + 1]) _offeredFQ.add(ALL_QUARTERS[_curIdx + 1].label);
+const fqSet = ALL_QUARTERS.filter(q => _offeredFQ.has(q.label)).map(q => q.label).reverse();
 const productSet = [...new Set(TESTS.map(t => t.product))];
 const prodSel = document.getElementById('productFilter');
 productSet.forEach(p => {{ const o = document.createElement('option'); o.value = p; o.text = p; prodSel.add(o); }});
@@ -506,7 +515,8 @@ let activeSurface = 'All';
 // Multi-select quarter filter
 const fqDropdown = document.getElementById('fqDropdown');
 const fqDisplay = document.getElementById('fqDisplay');
-const latestFQ = fqSet[0];
+// Default the filter to the current quarter (fall back to the newest quarter with tests)
+const latestFQ = (_curQ && fqSet.includes(_curQ.label)) ? _curQ.label : fqSet[0];
 let selectedFQs = new Set([latestFQ]);
 const allLabel = document.createElement('label');
 allLabel.innerHTML = `<input type="checkbox" id="fqAll"> All Quarters`;
