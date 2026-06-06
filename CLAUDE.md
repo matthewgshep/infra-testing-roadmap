@@ -63,7 +63,7 @@ The emitted page's main tabs:
 - **Experiment Lift** / **Experiment List** / **Velocity** — analysis views over the same `Results` data.
 - **Planning Roadmap** — a drag-and-drop planner. Persists to `plan.json` **on the `gh-pages` branch** via the **GitHub Contents API called directly from the browser**, using a PAT stored in `localStorage` (`gh_plan_token`). The read (`?ref=gh-pages`), the write (`branch: gh-pages` in the PUT body), and the deploy all target `gh-pages` — keep them in sync (`GH_BRANCH` constant in the JS, `PUBLISH_BRANCH` in Python). When run with `--serve`, planning instead POSTs to `/save-plan`, which writes a `Planning` sheet back into the Excel file (`save_plan_to_excel`).
 
-Screenshot → Results import is handled **locally only**, via `import_results.py` (server-side Claude vision → appends to the Excel `Results` sheet). There used to be an in-browser "Import Results" tab that called the Anthropic API directly from the page; it was removed — do not reintroduce browser-side API calls.
+Screenshot → Results import is handled **locally** (see "Ingesting result screenshots" below) — either in-session by Claude reading the images directly, or via `import_results.py`. There used to be an in-browser "Import Results" tab that called the Anthropic API directly from the page; it was removed — do not reintroduce browser-side API calls.
 
 ### Excel `Results` sheet column layout (1-indexed, header row 1)
 Both `generate_gantt.py` and `import_results.py` hard-code these positions — keep them in sync:
@@ -83,10 +83,22 @@ Status is derived, not stored: no end date + start in future → **Scheduled**; 
 ### Fiscal calendar
 `FY_STARTS` maps Adobe fiscal years to their start date (Saturday nearest Dec 1). `_extend_fy_starts()` auto-extends 3 FYs past today using a flat 364-day (52-week) roll. Adobe occasionally has 53-week fiscal years, so these auto-generated future starts drift and need manual correction roughly every ~5 years.
 
+## Ingesting result screenshots
+
+Result dashboards are captured as screenshots and turned into `Results` rows. Staging folder is `screenshots/` (gitignored); processed images are moved to `screenshots/processed/`. Two ways to extract — same target, same columns:
+
+**A. In-session (preferred; no API key, no extra billing).** Claude Code reads the image directly with the Read tool and writes the row via a short `openpyxl` snippet. This is the right path when there's no `ANTHROPIC_API_KEY` (a Claude.ai/Claude Code subscription does **not** grant API access). Hard-won practices, in order:
+1. **Close the workbook in Excel first**, then **back it up** — `openpyxl` rewrites the whole `.xlsx` on save and can drop charts/images on the `Gantt` sheet. Check for a `~$…xlsx` lock file to confirm Excel is closed; delete the backup only after verifying the result.
+2. **Don't trust the product field** — dashboards often don't say Reader vs Reduced Mode. Infer from an existing row for that RGS id, or ask; never just default it.
+3. **Check for an existing row by RGS id before writing.** The same RGS id may already exist (a different surface, or an interim/partial row). If so, **update that row** rather than appending — and **confirm with the user before overwriting existing metrics** (e.g. interim → baked numbers). The exact full test name often isn't on the dashboard (only the RGS id is), so match on the id, not the name.
+4. Write per the **real sheet headers** (table above), set the same number formats as neighboring rows (`mm-dd-yy` dates, `0.00%` lifts), and **highlight new/updated rows yellow** (`PatternFill('solid', fgColor='FFFDE7')`) for review.
+5. Move the screenshot to `screenshots/processed/`, then regenerate + `--deploy`.
+
+**B. Scripted (`import_results.py`; needs `ANTHROPIC_API_KEY`).** Automates the same extraction for batches via Claude vision, appends new rows, dedups on `(RGS id, product)`, and moves images to `processed/`. Use `--dry-run` to preview without writing. Note the venv is Python 3.9, so the script relies on `from __future__ import annotations` for its `X | None` type hints.
+
 ## Gotchas
 
 - **Output filename → `index.html` by design**: default `--output` is `Product Testing Roadmap.html` (gitignored on `main`); `--deploy` copies it to the publish clone as `index.html`. Locally generated `*.html` in this folder is scratch — don't commit it.
 - `plan.json` is the planning persistence file (not config). It lives on `gh-pages` only, committed alongside `index.html` on deploy and updated directly by the browser via the Contents API. `--deploy` creates it as `[]` if missing but never clobbers browser-saved data.
-- `generate_gantt.py` is currently untracked in this repo's git.
-- `~$...xlsx` is an Excel lock file — ignore it. Editing the workbook in Excel while a script reads it can cause inconsistent reads.
+- `~$...xlsx` is an Excel lock file (and a signal the workbook is open — its content names the lock owner). Ignore it; never write the `.xlsx` while it's present.
 - Model ID is pinned in source: `import_results.py` uses `claude-opus-4-5`. Update it if migrating models.
