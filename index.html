@@ -211,7 +211,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 05, 2026 at 02:05 PM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 05, 2026 at 09:57 PM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -1311,6 +1311,7 @@ let _planLoaded = false;
 let _planDirty = false;
 const GH_REPO = 'matthewgshep/infra-testing-roadmap';
 const GH_FILE = 'plan.json';
+const GH_BRANCH = 'gh-pages';  // plan.json lives on the published branch
 
 function ghGetToken() { return localStorage.getItem('gh_plan_token') || ''; }
 function ghSetToken(t) { localStorage.setItem('gh_plan_token', t); }
@@ -1424,7 +1425,7 @@ async function planSaveToGitHub() {
 
   try {
     // Get current SHA if file exists
-    const getResp = await fetch('https://api.github.com/repos/' + GH_REPO + '/contents/' + GH_FILE, {
+    const getResp = await fetch('https://api.github.com/repos/' + GH_REPO + '/contents/' + GH_FILE + '?ref=' + GH_BRANCH, {
       headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github.v3+json' }
     });
     let sha = null;
@@ -1435,7 +1436,8 @@ async function planSaveToGitHub() {
 
     const body = {
       message: 'Update experiment plan (' + plan.length + ' items)',
-      content: contentB64
+      content: contentB64,
+      branch: GH_BRANCH
     };
     if (sha) body.sha = sha;
 
