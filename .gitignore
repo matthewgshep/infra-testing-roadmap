@@ -3,6 +3,10 @@
 Product Testing Roadmap.html
 Product_Testing_Roadmap.html
 
+# Publish artifacts — these live on the gh-pages branch, not on main.
+index.html
+plan.json
+
 # macOS / Excel cruft
 .DS_Store
 ~$*.xlsx
