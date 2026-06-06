@@ -8,20 +8,22 @@ A single-purpose tool that turns an Excel roadmap of Adobe Acrobat (Reader / Red
 
 ## Two locations, one data flow
 
-This is the critical mental model. There are **two separate git checkouts**:
+This is the critical mental model. There are **two checkouts of the same repo (`matthewgshep/infra-testing-roadmap`), on two different branches**:
 
-- **This folder** (`~/Library/CloudStorage/OneDrive-Adobe/Reader & Reduced Mode - Infra Testing/`) — the OneDrive-synced **source**: the Excel file, the Python scripts, and generated HTML copies. Remote `origin` is `matthewgshep/infra-testing-roadmap`.
-- **`~/infra-testing-roadmap/`** — a *separate clone* used purely as the **GitHub Pages deploy target**. `--deploy` copies the generated HTML into it as `index.html`, commits, and pushes.
+- **This folder** (`~/Library/CloudStorage/OneDrive-Adobe/Reader & Reduced Mode - Infra Testing/`) — the OneDrive-synced **source**, on branch **`main`**: the Excel file, the Python scripts, CLAUDE.md. Locally generated HTML is gitignored, not committed.
+- **`~/infra-testing-roadmap/`** — the **publish clone**, kept on branch **`gh-pages`**. `--deploy` copies the generated HTML into it as `index.html`, commits, and pushes to `gh-pages`. GitHub Pages serves from `gh-pages`.
+
+The branch split is deliberate: `main` (source) and `gh-pages` (published `index.html`) never touch the same files, so the two checkouts never collide. Don't make `main` track `index.html`/`plan.json` again, and don't point the deploy at `main`.
 
 Data flow:
 ```
-Reader & Reduced Mode Testing Roadmap.xlsx   (source of truth)
+Reader & Reduced Mode Testing Roadmap.xlsx   (source of truth, on main)
         │  generate_gantt.py reads sheets: Results, Backlog, Planning
         ▼
-Product Testing Roadmap.html                 (self-contained output, default --output)
-        │  --deploy: shutil.copy2 → ~/infra-testing-roadmap/index.html → git push
+Product Testing Roadmap.html                 (self-contained output, default --output; gitignored)
+        │  --deploy: shutil.copy2 → ~/infra-testing-roadmap/index.html → commit + push to gh-pages
         ▼
-https://matthewgshep.github.io/infra-testing-roadmap/
+https://matthewgshep.github.io/infra-testing-roadmap/   (served from gh-pages)
 ```
 
 The Excel workbook is the source of truth. Everything else is generated or derived from it.
@@ -59,7 +61,7 @@ There are no tests or linters. Verify changes by regenerating the HTML and openi
 The emitted page's main tabs:
 - **Results Roadmap** — the Gantt of completed/running/scheduled tests.
 - **Experiment Lift** / **Experiment List** / **Velocity** — analysis views over the same `Results` data.
-- **Planning Roadmap** — a drag-and-drop planner. Persists to `plan.json` in the GitHub repo via the **GitHub Contents API called directly from the browser**, using a PAT stored in `localStorage` (`gh_plan_token`). When run with `--serve`, planning instead POSTs to `/save-plan`, which writes a `Planning` sheet back into the Excel file (`save_plan_to_excel`).
+- **Planning Roadmap** — a drag-and-drop planner. Persists to `plan.json` **on the `gh-pages` branch** via the **GitHub Contents API called directly from the browser**, using a PAT stored in `localStorage` (`gh_plan_token`). The read (`?ref=gh-pages`), the write (`branch: gh-pages` in the PUT body), and the deploy all target `gh-pages` — keep them in sync (`GH_BRANCH` constant in the JS, `PUBLISH_BRANCH` in Python). When run with `--serve`, planning instead POSTs to `/save-plan`, which writes a `Planning` sheet back into the Excel file (`save_plan_to_excel`).
 
 Screenshot → Results import is handled **locally only**, via `import_results.py` (server-side Claude vision → appends to the Excel `Results` sheet). There used to be an in-browser "Import Results" tab that called the Anthropic API directly from the page; it was removed — do not reintroduce browser-side API calls.
 
@@ -83,8 +85,8 @@ Status is derived, not stored: no end date + start in future → **Scheduled**; 
 
 ## Gotchas
 
-- **Output filename mismatch by design**: default `--output` is `Product Testing Roadmap.html`, but `--deploy` copies it to the repo as `index.html`. The folder therefore accumulates several near-identical HTML copies (`index.html`, `Product_Testing_Roadmap.html`, `Product Testing Roadmap.html`) — don't assume they're meaningfully different.
-- `plan.json` lives in both checkouts and is committed alongside `index.html` on deploy; it's the planning persistence file, not config.
+- **Output filename → `index.html` by design**: default `--output` is `Product Testing Roadmap.html` (gitignored on `main`); `--deploy` copies it to the publish clone as `index.html`. Locally generated `*.html` in this folder is scratch — don't commit it.
+- `plan.json` is the planning persistence file (not config). It lives on `gh-pages` only, committed alongside `index.html` on deploy and updated directly by the browser via the Contents API. `--deploy` creates it as `[]` if missing but never clobbers browser-saved data.
 - `generate_gantt.py` is currently untracked in this repo's git.
 - `~$...xlsx` is an Excel lock file — ignore it. Editing the workbook in Excel while a script reads it can cause inconsistent reads.
 - Model ID is pinned in source: `import_results.py` uses `claude-opus-4-5`. Update it if migrating models.
