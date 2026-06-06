@@ -1494,6 +1494,7 @@ let _planLoaded = false;
 let _planDirty = false;
 const GH_REPO = 'matthewgshep/infra-testing-roadmap';
 const GH_FILE = 'plan.json';
+const GH_BRANCH = 'gh-pages';  // plan.json lives on the published branch
 
 function ghGetToken() {{ return localStorage.getItem('gh_plan_token') || ''; }}
 function ghSetToken(t) {{ localStorage.setItem('gh_plan_token', t); }}
@@ -1607,7 +1608,7 @@ async function planSaveToGitHub() {{
 
   try {{
     // Get current SHA if file exists
-    const getResp = await fetch('https://api.github.com/repos/' + GH_REPO + '/contents/' + GH_FILE, {{
+    const getResp = await fetch('https://api.github.com/repos/' + GH_REPO + '/contents/' + GH_FILE + '?ref=' + GH_BRANCH, {{
       headers: {{ 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github.v3+json' }}
     }});
     let sha = null;
@@ -1618,7 +1619,8 @@ async function planSaveToGitHub() {{
 
     const body = {{
       message: 'Update experiment plan (' + plan.length + ' items)',
-      content: contentB64
+      content: contentB64,
+      branch: GH_BRANCH
     }};
     if (sha) body.sha = sha;
 
@@ -2010,8 +2012,16 @@ function planExport() {{
 </html>'''
 
 
+PUBLISH_BRANCH = 'gh-pages'  # the deploy branch GitHub Pages serves from
+
+
 def deploy_to_github(html_path, repo_path):
-    """Copy generated HTML as index.html to the GitHub Pages repo, commit, and push."""
+    """Copy generated HTML as index.html to the Pages repo's publish branch, commit, and push.
+
+    Publishing lives on its own branch (PUBLISH_BRANCH) so it never collides with the
+    source branch (main), which tracks the scripts/data. The browser Planning tab also
+    commits plan.json to this branch via the GitHub API, so we sync before adding.
+    """
     repo = Path(repo_path).expanduser().resolve()
 
     if not repo.exists():
@@ -2019,12 +2029,28 @@ def deploy_to_github(html_path, repo_path):
         print(f"  To set up for the first time:")
         print(f"    1. gh repo create infra-testing-roadmap --public")
         print(f"    2. git clone <repo-url> {repo}")
-        print(f"    3. Enable Pages in repo Settings > Pages > Source: main")
+        print(f"    3. git -C {repo} checkout -b {PUBLISH_BRANCH}")
+        print(f"    4. Enable Pages in repo Settings > Pages > Source: {PUBLISH_BRANCH}")
         return False
 
     if not (repo / '.git').exists():
         print(f"\n  ERROR: {repo} is not a git repository.")
         return False
+
+    # Switch to the publish branch and sync with the remote first, since the browser
+    # Planning tab can have committed plan.json there ahead of this local clone.
+    try:
+        subprocess.run(['git', 'checkout', PUBLISH_BRANCH], cwd=repo, check=True, capture_output=True)
+    except subprocess.CalledProcessError as e:
+        stderr = e.stderr.decode() if e.stderr else ''
+        print(f"\n  ERROR: could not switch to '{PUBLISH_BRANCH}': {stderr or e}")
+        print(f"  Create it once with: git -C {repo} checkout -b {PUBLISH_BRANCH}")
+        return False
+    try:
+        subprocess.run(['git', 'fetch', 'origin', PUBLISH_BRANCH], cwd=repo, check=True, capture_output=True, timeout=30)
+        subprocess.run(['git', 'rebase', f'origin/{PUBLISH_BRANCH}'], cwd=repo, check=True, capture_output=True, timeout=30)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        print("  (could not sync with remote first — continuing; push may need a manual pull)")
 
     # Copy HTML as index.html (skip if already the same file)
     dest = repo / 'index.html'
@@ -2035,7 +2061,7 @@ def deploy_to_github(html_path, repo_path):
     else:
         print(f"  Output is already at: {dest}")
 
-    # Create plan.json if it doesn't exist yet
+    # Create plan.json if it doesn't exist yet (never clobber browser-saved data)
     plan_file = repo / 'plan.json'
     if not plan_file.exists():
         plan_file.write_text('[]')
@@ -2045,21 +2071,13 @@ def deploy_to_github(html_path, repo_path):
     try:
         subprocess.run(['git', 'add', 'index.html', 'plan.json'], cwd=repo, check=True, capture_output=True)
 
-        # Check if this is a brand-new repo (no commits yet)
-        has_commits = subprocess.run(
-            ['git', 'rev-parse', 'HEAD'],
+        result = subprocess.run(
+            ['git', 'diff', '--cached', '--quiet'],
             cwd=repo, capture_output=True
-        ).returncode == 0
-
-        # If repo has commits, check whether anything actually changed
-        if has_commits:
-            result = subprocess.run(
-                ['git', 'diff', '--cached', '--quiet'],
-                cwd=repo, capture_output=True
-            )
-            if result.returncode == 0:
-                print("  No changes to deploy (HTML is identical to last push).")
-                return True
+        )
+        if result.returncode == 0:
+            print("  No changes to deploy (HTML is identical to last push).")
+            return True
 
         ts = datetime.now().strftime('%Y-%m-%d %H:%M')
         subprocess.run(
@@ -2068,11 +2086,8 @@ def deploy_to_github(html_path, repo_path):
         )
         print(f"  Committed: Update roadmap — {ts}")
 
-        push_cmd = ['git', 'push']
-        if not has_commits:
-            push_cmd = ['git', 'push', '-u', 'origin', 'main']
         subprocess.run(
-            push_cmd,
+            ['git', 'push', '-u', 'origin', PUBLISH_BRANCH],
             cwd=repo, check=True, capture_output=True, timeout=30
         )
         print("  Pushed to remote.")

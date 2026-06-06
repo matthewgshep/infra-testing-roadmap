@@ -1,0 +1,13 @@
+# Local generated HTML from generate_gantt.py.
+# The published copy lives on the gh-pages branch (and ~/infra-testing-roadmap) as index.html.
+Product Testing Roadmap.html
+Product_Testing_Roadmap.html
+
+# macOS / Excel cruft
+.DS_Store
+~$*.xlsx
+
+# Python
+.venv/
+__pycache__/
+*.pyc
