@@ -25,6 +25,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -96,12 +97,27 @@ def extract_from_screenshot(client: anthropic.Anthropic, image_path: Path) -> li
     return parsed if isinstance(parsed, list) else [parsed]
 
 
-def get_existing_test_names(ws) -> set[str]:
-    names = set()
+def rgs_id(name) -> str | None:
+    """Extract the RGS identifier (e.g. 'RGS0469') from a test name, if present."""
+    m = re.search(r'RGS\d+', str(name or ''), re.IGNORECASE)
+    return m.group(0).upper() if m else None
+
+
+def dedup_key(test_name, product):
+    """Key a row by (RGS id, product) so the same experiment is caught even when the
+    rest of the test name differs, while genuine per-surface variants stay distinct.
+    Falls back to the full name when there's no RGS id."""
+    rid = rgs_id(test_name)
+    prod = str(product or '').strip()
+    return (rid, prod) if rid else (None, str(test_name or '').strip())
+
+
+def get_existing_keys(ws) -> set:
+    keys = set()
     for row in ws.iter_rows(min_row=2, values_only=True):
-        if row[2]:  # Test Name is column C (index 2)
-            names.add(str(row[2]).strip())
-    return names
+        if row[2]:  # Test Name is column C (index 2); Product is column B (index 1)
+            keys.add(dedup_key(row[2], row[1]))
+    return keys
 
 
 def parse_date(val) -> datetime | None:
@@ -235,20 +251,21 @@ def main():
     wb = load_workbook(excel)
     ws = wb['Results']
 
-    existing = get_existing_test_names(ws)
+    existing = get_existing_keys(ws)
     next_row = ws.max_row + 1
     added = 0
     skipped = 0
 
     for row in all_rows:
         name = (row.get('test_name') or '').strip()
-        if name in existing:
+        key = dedup_key(name, row.get('product'))
+        if key in existing:
             print(f"  SKIP (already exists): {name}")
             skipped += 1
             continue
         append_row(ws, row, next_row)
         print(f"  ADDED row {next_row}: {name}")
-        existing.add(name)
+        existing.add(key)
         next_row += 1
         added += 1
 

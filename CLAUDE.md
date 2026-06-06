@@ -73,10 +73,10 @@ Both `generate_gantt.py` and `import_results.py` hard-code these positions — k
 | 2 | Product | 9 | Units % lift |
 | 3 | Test Name | 10 | Winner |
 | 4 | Start date | 11 | GDS link (text + hyperlink) |
-| 5 | End date | 12 | Action-if-contrary |
-| 6 | QGNARR | 13 | Details / decision |
-| 7 | GNARR lift | 14 | Result-contrary |
-| 8 | CTR lift | 15 | PM commentary |
+| 5 | End date | 12 | Decision/Details |
+| 6 | QGNARR | 13 | Result contrary to expectation |
+| 7 | GNARR lift | 14 | PM Questions/Commentary |
+| 8 | CTR lift | | *(sheet ends at col 14)* |
 
 Status is derived, not stored: no end date + start in future → **Scheduled**; no end date + started → **Running**; else **Complete**. A row is skipped unless it has a Product and a real `datetime` start. Product strings `Acrobat Reader`/`Acrobat Reduced Mode` are normalized to `Reader`/`Reduced Mode`.
 

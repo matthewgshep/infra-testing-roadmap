@@ -96,10 +96,9 @@ def extract_data(excel_path):
         gds_text = ws.cell(r, 11).value
         gds_cell = ws_links.cell(r, 11)
         gds_url = gds_cell.hyperlink.target if gds_cell.hyperlink else None
-        action_contrary = ws.cell(r, 12).value
-        details = ws.cell(r, 13).value
-        result_contrary = ws.cell(r, 14).value
-        pm_commentary = ws.cell(r, 15).value
+        details = ws.cell(r, 12).value          # col 12: Decision/Details
+        result_contrary = ws.cell(r, 13).value  # col 13: Result contrary to expectation
+        pm_commentary = ws.cell(r, 14).value     # col 14: PM Questions/Commentary
         if not product or not isinstance(start, datetime):
             continue
         has_no_end = not isinstance(end, datetime)
@@ -132,7 +131,6 @@ def extract_data(excel_path):
             'status': status,
             'gds_text': fmt_str(gds_text),
             'gds_url': gds_url,
-            'action_contrary': fmt_str(action_contrary),
             'details': fmt_str(details),
             'result_contrary': fmt_str(result_contrary),
             'pm_commentary': fmt_str(pm_commentary),
@@ -847,7 +845,6 @@ function buildDetailHtml(t) {{
   html += `<div><span class="dl">Status</span><div class="dv">${{t.status}}</div></div>`;
   html += `<div><span class="dl">Winner</span><div class="dv">${{t.winner || '\\u2014'}}</div></div>`;
   if (t.result_contrary) html += `<div><span class="dl">Result Contrary</span><div class="dv">${{esc(t.result_contrary)}}</div></div>`;
-  if (t.action_contrary) html += `<div><span class="dl">Action Contrary</span><div class="dv">${{esc(t.action_contrary)}}</div></div>`;
   html += '</div>';
   // Option C metric detail cards
   html += '<div class="metric-detail-row">';
