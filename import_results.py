@@ -163,18 +163,39 @@ def read_excel_summary(excel_path: Path) -> dict:
         if 'full_name' in out:
             break
 
-    # Overall metric rows: label@col F (idx5), Control(idx6), Challenger1(idx7), Lift%(idx8)
+    # Overall metric rows: label@col F (idx5), Control(idx6), Challenger1(idx7), Lift%(idx8).
+    # Also collect the "Enrolled Members" block to compute CTR (see below).
+    enr = vis = ratio = None   # each: (control, challenger1)
     for row in grid:
         if len(row) < 9 or not isinstance(row[5], str):
             continue
         label = row[5].strip().lower()
-        ch1, lift = row[7], row[8]
+        ctrl, ch1, lift = row[6], row[7], row[8]
         if label == 'units' and isinstance(lift, (int, float)):
             out['units_pct'] = round(float(lift), 4)
         elif label in ('gross new arr', 'gnarr') and isinstance(lift, (int, float)):
             out['gnarr_lift'] = round(float(lift), 4)
             if isinstance(ch1, (int, float)):
                 out['qgnarr'] = int(round(ch1))   # Challenger Gross-New-ARR $ (QGNARR mapping — verify)
+        elif 'akamai' in label and 'enrolled' in label and 'visitor' not in label and 'over' not in label:
+            enr = (ctrl, ch1)                      # Total Enrolled (Akamai)
+        elif 'visitor' in label and 'over' not in label and 'akamai' not in label:
+            vis = (ctrl, ch1)                      # Total Visitors
+        elif 'visitor' in label and 'over' in label:
+            ratio = (ctrl, ch1)                    # precomputed Visitors / Akamai enrolled (fallback)
+
+    # CTR = lift in (unique visitors / Akamai enrollments) between challenger and control.
+    def _num(x):
+        return x if isinstance(x, (int, float)) else None
+    def _rate(v, e):
+        v, e = _num(v), _num(e)
+        return (v / e) if (v is not None and e) else None
+    ctrl_rate = _rate(vis[0], enr[0]) if (vis and enr) else None
+    ch_rate   = _rate(vis[1], enr[1]) if (vis and enr) else None
+    if ctrl_rate is None and ratio:   # fall back to the precomputed ratio row
+        ctrl_rate, ch_rate = _num(ratio[0]), _num(ratio[1])
+    if ctrl_rate and ch_rate is not None:
+        out['ctr'] = round(ch_rate / ctrl_rate - 1, 4)
     return out
 
 
@@ -188,7 +209,7 @@ def enrich_from_excel(row: dict, results_dir: Path) -> str | None:
     if not excel:
         return None
     summ = read_excel_summary(excel)
-    for k in ('qgnarr', 'gnarr_lift', 'units_pct'):
+    for k in ('qgnarr', 'gnarr_lift', 'units_pct', 'ctr'):
         if summ.get(k) is not None:
             row[k] = summ[k]
     for k in ('start_date', 'end_date'):
