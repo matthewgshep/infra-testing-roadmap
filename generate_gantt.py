@@ -295,6 +295,7 @@ def generate_html(data):
   .left-row .expand-icon {{ font-size: 9px; color: var(--text-muted); margin-right: 4px; transition: transform 0.15s; }}
   .left-row.expanded .expand-icon {{ transform: rotate(90deg); }}
   .left-row.expanded {{ background: #e8f0fe !important; }}
+  .scoreboard-title {{ display: none; padding: 8px 18px 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--blue-dark); background: var(--surface); }}
   .revenue-strip {{ display: flex; gap: 0; padding: 0; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; font-size: 11px; }}
   .revenue-strip:empty {{ display: none; }}
   .rev-card {{ flex: 0 0 auto; padding: 10px 18px; border-right: 1px solid var(--border); position: relative; }}
@@ -424,6 +425,7 @@ def generate_html(data):
 <div class="legend" style="display:none;">
 </div>
 <div class="stats" id="statsBar"></div>
+<div class="scoreboard-title" id="scoreboardTitle">In-Quarter Scoreboard</div>
 <div class="revenue-strip" id="revenueStrip"></div>
 <div class="gantt-wrapper" id="ganttWrapper">
   <div class="left-panel" id="leftPanel"></div>
@@ -634,40 +636,51 @@ function calcRevenueByQuarter(tests) {{
   const qMap = {{}};
   QUARTERS.forEach(q => {{
     if (!visibleFQs.includes(q.label)) return;
-    qMap[q.label] = {{ label: q.label, start: new Date(q.start), end: new Date(q.end), qgnarrTotal: 0, realized: 0, projected: 0, testCount: 0, contributions: [] }};
+    qMap[q.label] = {{ label: q.label, start: new Date(q.start), end: new Date(q.end), qgnarrTotal: 0, realized: 0, projected: 0, testCount: 0, contributions: [], liftSum: 0, liftN: 0, surf: {{}} }};
   }});
   const DAY_MS = 86400000;
   const Q_DAYS = 91; // 13 weeks × 7 days
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   tests.forEach(t => {{
-    if (t.qgnarr === null || t.status === 'Running' || t.status === 'Scheduled') return;
+    if (t.status === 'Running' || t.status === 'Scheduled') return;  // completed tests only
     const ts = new Date(t.start), te = new Date(t.end);
-    const dailyValue = t.qgnarr / Q_DAYS;
+    const hasQ = t.qgnarr !== null;
+    const dailyValue = hasQ ? t.qgnarr / Q_DAYS : 0;
     const isWinner = t.winner && (t.winner === 'Rollout' || t.winner.startsWith('Challenger'));
     Object.values(qMap).forEach(qObj => {{
       const qs = qObj.start, qe = qObj.end;
       if (te >= qs && te <= qe) {{
-        // Realized: days from test end to min(today, quarter end)
-        const realizedEnd = today < qe ? today : qe;
-        const realizedDays = Math.min(Q_DAYS, Math.max(0, Math.round((realizedEnd.getTime() - te.getTime()) / DAY_MS) + 1));
-        const realizedAmt = dailyValue * realizedDays;
-        // Remaining: days from today (or test end, whichever is later) to quarter end
-        const remainStart = today > te ? today : te;
-        const remainingDays = Math.max(0, Math.round((qe.getTime() - remainStart.getTime()) / DAY_MS));
-        qObj.qgnarrTotal += t.qgnarr;
-        qObj.realized += realizedAmt;
-        qObj.testCount++;
-        let remainingAmt = 0;
-        if (isWinner && remainingDays > 0) {{
-          remainingAmt = dailyValue * remainingDays;
-          qObj.projected += remainingAmt;
+        // Scoreboard stats over all completed tests ending in the quarter
+        if (t.gnarr !== null) {{ qObj.liftSum += t.gnarr; qObj.liftN++; }}
+        if (t.winner) {{   // decided tests only count toward win rate
+          const s = qObj.surf[t.product] || (qObj.surf[t.product] = {{ decided: 0, wins: 0 }});
+          s.decided++;
+          if (isWinner) s.wins++;
         }}
-        qObj.contributions.push({{
-          name: t.name, product: t.product, winner: t.winner,
-          qgnarr: t.qgnarr, realized: realizedAmt, remaining: remainingAmt,
-          endDate: t.end, days: realizedDays
-        }});
+        // QGNARR realization projection — only for tests that have a QGNARR value
+        if (hasQ) {{
+          // Realized: days from test end to min(today, quarter end)
+          const realizedEnd = today < qe ? today : qe;
+          const realizedDays = Math.min(Q_DAYS, Math.max(0, Math.round((realizedEnd.getTime() - te.getTime()) / DAY_MS) + 1));
+          const realizedAmt = dailyValue * realizedDays;
+          // Remaining: days from today (or test end, whichever is later) to quarter end
+          const remainStart = today > te ? today : te;
+          const remainingDays = Math.max(0, Math.round((qe.getTime() - remainStart.getTime()) / DAY_MS));
+          qObj.qgnarrTotal += t.qgnarr;
+          qObj.realized += realizedAmt;
+          qObj.testCount++;
+          let remainingAmt = 0;
+          if (isWinner && remainingDays > 0) {{
+            remainingAmt = dailyValue * remainingDays;
+            qObj.projected += remainingAmt;
+          }}
+          qObj.contributions.push({{
+            name: t.name, product: t.product, winner: t.winner,
+            qgnarr: t.qgnarr, realized: realizedAmt, remaining: remainingAmt,
+            endDate: t.end, days: realizedDays
+          }});
+        }}
       }}
     }});
   }});
@@ -675,8 +688,10 @@ function calcRevenueByQuarter(tests) {{
 }}
 function renderRevenueStrip(filtered) {{
   const strip = document.getElementById('revenueStrip');
+  const title = document.getElementById('scoreboardTitle');
   const revData = calcRevenueByQuarter(filtered);
-  if (revData.length === 0) {{ strip.innerHTML = ''; return; }}
+  if (revData.length === 0) {{ strip.innerHTML = ''; if (title) title.style.display = 'none'; return; }}
+  if (title) title.style.display = 'block';
   let html = '';
   revData.forEach((q, qi) => {{
     // Build detail table rows
@@ -698,11 +713,22 @@ function renderRevenueStrip(filtered) {{
       </tr>`;
     }});
     const inQuarterTotal = q.realized + q.projected;
+    const avgLiftStr = q.liftN ? ((q.liftSum / q.liftN) * 100).toFixed(2) + '%' : '\\u2014';
+    let winItems = '';
+    ['Reader', 'Reduced Mode'].forEach(p => {{
+      const s = q.surf[p];
+      if (s && s.decided) {{
+        const pct = Math.round(s.wins / s.decided * 100);
+        winItems += `<div class="rev-item"><span class="rev-label">Win Rate \\u00b7 ${{p}}</span><span class="rev-val">${{pct}}% <span style="font-weight:400;color:var(--text-muted);font-size:10px;">(${{s.wins}}/${{s.decided}})</span></span></div>`;
+      }}
+    }});
     html += `<div class="rev-card" style="position:relative;">
       <div class="rev-fq">${{q.label}}<span class="rev-expand" data-qi="${{qi}}">&#9660;</span></div>
       <div class="rev-metrics">
         <div class="rev-item"><span class="rev-label">QGNARR Projection</span><span class="rev-val">${{fmtCompact(q.qgnarrTotal)}}</span></div>
         <div class="rev-item"><span class="rev-label">In Quarter Realization Projection</span><span class="rev-val highlight">${{fmtCompact(inQuarterTotal)}}</span></div>
+        <div class="rev-item"><span class="rev-label">Avg GNARR Lift</span><span class="rev-val">${{avgLiftStr}}</span></div>
+        ${{winItems}}
         <div class="rev-item"><span class="rev-label">Tests</span><span class="rev-val">${{q.testCount}}</span></div>
       </div>
       <div class="rev-detail-popout" id="revDetail${{qi}}">
@@ -882,11 +908,9 @@ function render() {{
   const visWeeks = getVisibleWeeks();
   const running = filtered.filter(t => t.status === 'Running').length;
   const scheduled = filtered.filter(t => t.status === 'Scheduled').length;
-  const avgLift = filtered.filter(t => t.gnarr !== null);
-  const avg = avgLift.length ? (avgLift.reduce((s, t) => s + t.gnarr, 0) / avgLift.length * 100).toFixed(2) : '\\u2014';
   let statsText = `<span>${{filtered.length}} tests</span><span>${{running}} running</span>`;
   if (scheduled) statsText += `<span>${{scheduled}} scheduled</span>`;
-  statsText += `<span>Avg GNARR Lift: ${{avg}}%</span><span style="opacity:0.6;">Click a row for full details</span>`;
+  statsText += `<span style="opacity:0.6;">Click a row for full details</span>`;
   document.getElementById('statsBar').innerHTML = statsText;
   renderRevenueStrip(filtered);
   const lp = document.getElementById('leftPanel');
