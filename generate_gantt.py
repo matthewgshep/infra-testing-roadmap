@@ -301,7 +301,12 @@ def generate_html(data):
   .rev-card {{ flex: 0 0 auto; padding: 10px 18px; border-right: 1px solid var(--border); position: relative; }}
   .rev-card:last-child {{ border-right: none; }}
   .rev-card .rev-fq {{ font-weight: 700; color: var(--blue-dark); font-size: 12px; margin-bottom: 6px; }}
-  .rev-card .rev-metrics {{ display: flex; gap: 16px; }}
+  .rev-card .rev-metrics {{ display: flex; gap: 16px; align-items: flex-start; }}
+  .rev-surf {{ display: flex; flex-direction: column; gap: 4px; padding-left: 12px; border-left: 1px solid var(--border); }}
+  .rev-surf-head {{ font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; }}
+  .rev-surf-head.rev-surf-reader {{ color: #1d4ed8; }}
+  .rev-surf-head.rev-surf-reduced {{ color: #7c3aed; }}
+  .rev-surf-metrics {{ display: flex; gap: 14px; }}
   .rev-card .rev-item {{ display: flex; flex-direction: column; }}
   .rev-card .rev-label {{ font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); }}
   .rev-card .rev-val {{ font-size: 13px; font-weight: 700; color: var(--text); }}
@@ -636,7 +641,7 @@ function calcRevenueByQuarter(tests) {{
   const qMap = {{}};
   QUARTERS.forEach(q => {{
     if (!visibleFQs.includes(q.label)) return;
-    qMap[q.label] = {{ label: q.label, start: new Date(q.start), end: new Date(q.end), qgnarrTotal: 0, realized: 0, projected: 0, testCount: 0, contributions: [], liftSum: 0, liftN: 0, surf: {{}} }};
+    qMap[q.label] = {{ label: q.label, start: new Date(q.start), end: new Date(q.end), qgnarrTotal: 0, realized: 0, projected: 0, testCount: 0, contributions: [], surf: {{}} }};
   }});
   const DAY_MS = 86400000;
   const Q_DAYS = 91; // 13 weeks × 7 days
@@ -651,10 +656,10 @@ function calcRevenueByQuarter(tests) {{
     Object.values(qMap).forEach(qObj => {{
       const qs = qObj.start, qe = qObj.end;
       if (te >= qs && te <= qe) {{
-        // Scoreboard stats over all completed tests ending in the quarter
-        if (t.gnarr !== null) {{ qObj.liftSum += t.gnarr; qObj.liftN++; }}
+        // Scoreboard stats per surface, over all completed tests ending in the quarter
+        const s = qObj.surf[t.product] || (qObj.surf[t.product] = {{ decided: 0, wins: 0, liftSum: 0, liftN: 0 }});
+        if (t.gnarr !== null) {{ s.liftSum += t.gnarr; s.liftN++; }}
         if (t.winner) {{   // decided tests only count toward win rate
-          const s = qObj.surf[t.product] || (qObj.surf[t.product] = {{ decided: 0, wins: 0 }});
           s.decided++;
           if (isWinner) s.wins++;
         }}
@@ -713,22 +718,29 @@ function renderRevenueStrip(filtered) {{
       </tr>`;
     }});
     const inQuarterTotal = q.realized + q.projected;
-    const avgLiftStr = q.liftN ? ((q.liftSum / q.liftN) * 100).toFixed(2) + '%' : '\\u2014';
-    let winItems = '';
-    ['Reader', 'Reduced Mode'].forEach(p => {{
+    // Per-surface block: header + Avg GNARR Lift and Win Rate underneath
+    let surfBlocks = '';
+    [['Reader', 'rev-surf-reader'], ['Reduced Mode', 'rev-surf-reduced']].forEach(([p, cls]) => {{
       const s = q.surf[p];
-      if (s && s.decided) {{
-        const pct = Math.round(s.wins / s.decided * 100);
-        winItems += `<div class="rev-item"><span class="rev-label">Win Rate \\u00b7 ${{p}}</span><span class="rev-val">${{pct}}% <span style="font-weight:400;color:var(--text-muted);font-size:10px;">(${{s.wins}}/${{s.decided}})</span></span></div>`;
-      }}
+      if (!s) return;
+      const liftStr = s.liftN ? ((s.liftSum / s.liftN) * 100).toFixed(2) + '%' : '\\u2014';
+      const winStr = s.decided
+        ? Math.round(s.wins / s.decided * 100) + '% <span style="font-weight:400;color:var(--text-muted);font-size:10px;">(' + s.wins + '/' + s.decided + ')</span>'
+        : '\\u2014';
+      surfBlocks += `<div class="rev-surf">
+        <div class="rev-surf-head ${{cls}}">${{p}}</div>
+        <div class="rev-surf-metrics">
+          <div class="rev-item"><span class="rev-label">Avg GNARR Lift</span><span class="rev-val">${{liftStr}}</span></div>
+          <div class="rev-item"><span class="rev-label">Win Rate</span><span class="rev-val">${{winStr}}</span></div>
+        </div>
+      </div>`;
     }});
     html += `<div class="rev-card" style="position:relative;">
       <div class="rev-fq">${{q.label}}<span class="rev-expand" data-qi="${{qi}}">&#9660;</span></div>
       <div class="rev-metrics">
         <div class="rev-item"><span class="rev-label">QGNARR Projection</span><span class="rev-val">${{fmtCompact(q.qgnarrTotal)}}</span></div>
         <div class="rev-item"><span class="rev-label">In Quarter Realization Projection</span><span class="rev-val highlight">${{fmtCompact(inQuarterTotal)}}</span></div>
-        <div class="rev-item"><span class="rev-label">Avg GNARR Lift</span><span class="rev-val">${{avgLiftStr}}</span></div>
-        ${{winItems}}
+        ${{surfBlocks}}
         <div class="rev-item"><span class="rev-label">Tests</span><span class="rev-val">${{q.testCount}}</span></div>
       </div>
       <div class="rev-detail-popout" id="revDetail${{qi}}">
