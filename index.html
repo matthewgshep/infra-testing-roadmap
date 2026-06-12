@@ -211,7 +211,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 12, 2026 at 11:06 AM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 12, 2026 at 11:11 AM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -1190,17 +1190,18 @@ function renderVelocity() {
     months.push({ label: dt.toLocaleString('en', { month: 'short' }) + ' ' + String(dt.getFullYear()).slice(2), year: dt.getFullYear(), month: dt.getMonth(), count: 0 });
     dt.setMonth(dt.getMonth() + 1);
   }
-  // Dedup: collapse language variants (same name minus trailing lang code)
+  // Bin completed tests by end date (completion date)
   const seen = new Set();
   TESTS.forEach(t => {
-    const s = new Date(t.start);
-    if (s < windowStart || s > windowEnd) return;
+    if (t.status !== 'Complete') return;
+    const e = new Date(t.end);
+    if (e < windowStart || e > windowEnd) return;
     // Simple dedup: strip trailing " - XX" language codes
     const baseName = t.name.replace(/\s*[-–]\s*[A-Z]{2}$/i, '').trim();
-    const key = baseName + '|' + s.getFullYear() + '-' + s.getMonth();
+    const key = baseName + '|' + e.getFullYear() + '-' + e.getMonth();
     if (seen.has(key)) return;
     seen.add(key);
-    const mi = months.findIndex(m => m.year === s.getFullYear() && m.month === s.getMonth());
+    const mi = months.findIndex(m => m.year === e.getFullYear() && m.month === e.getMonth());
     if (mi >= 0) months[mi].count++;
   });
   const labels = months.map(m => m.label);
@@ -1240,7 +1241,7 @@ function renderVelocity() {
       labels: labels,
       datasets: [
         {
-          label: 'Experiments launched',
+          label: 'Experiments completed',
           data: counts,
           backgroundColor: counts.map((v, i) => {
             const m = months[i];
@@ -1303,7 +1304,7 @@ function renderVelocity() {
       },
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
-        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, title: { display: true, text: 'Experiments launched', font: { size: 12, weight: '600' } } }
+        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, title: { display: true, text: 'Experiments completed', font: { size: 12, weight: '600' } } }
       }
     }
   });
