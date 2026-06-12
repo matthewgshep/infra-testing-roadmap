@@ -191,6 +191,7 @@
   .plan-bar.scheduled-plan { background: repeating-linear-gradient(45deg, #a855f7, #a855f7 4px, #c084fc 4px, #c084fc 8px); opacity: 0.5; cursor: default; color: white; }
   .plan-bar.planned { background: #8b5cf6; box-shadow: 0 2px 6px rgba(139,92,246,0.3); cursor: grab; }
   .plan-bar.planned:hover { box-shadow: 0 3px 10px rgba(139,92,246,0.4); }
+  .plan-bar-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; pointer-events: none; }
   .plan-bar .plan-resize { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 4; }
   .plan-bar .plan-resize.left { left: -2px; }
   .plan-bar .plan-resize.right { right: -2px; }
@@ -216,7 +217,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 12, 2026 at 11:49 AM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 12, 2026 at 11:53 AM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -1643,9 +1644,9 @@ function renderPlan() {
     const barWidth = p.duration * PLAN_CELL;
     lanesHtml += `<div class="plan-lane" style="height:${PLAN_ROW_H}px;min-width:${labelW + totalW}px;" data-plan-idx="${pi}">
       <div class="plan-lane-label" style="width:${labelW}px;">${esc(p.name.substring(0, 28))}</div>
-      <div class="plan-bar planned" style="left:${barLeft}px;width:${barWidth}px;" data-plan-idx="${pi}" title="${escAttr(p.name)}">
+      <div class="plan-bar planned" style="left:${barLeft}px;width:${barWidth}px;" data-plan-idx="${pi}">
         <div class="plan-resize left" data-plan-idx="${pi}" data-edge="left"></div>
-        ${esc(p.name.substring(0, 20))}
+        <span class="plan-bar-label">${esc(p.name)}</span>
         <div class="plan-resize right" data-plan-idx="${pi}" data-edge="right"></div>
         <div class="plan-remove" data-plan-idx="${pi}">\u00D7</div>
       </div>
@@ -1856,9 +1857,35 @@ function renderPlan() {
       });
     });
 
+    // Hover tooltip — full name
+    bar.addEventListener('mouseenter', () => {
+      let tip = document.getElementById('planBarTip');
+      if (!tip) {
+        tip = document.createElement('div');
+        tip.id = 'planBarTip';
+        tip.style.cssText = 'position:fixed;background:var(--blue-dark);color:white;font-size:11px;font-weight:600;padding:4px 10px;border-radius:4px;white-space:nowrap;z-index:100;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:none;';
+        document.body.appendChild(tip);
+      }
+      tip.textContent = item.name;
+      tip.style.display = 'block';
+    });
+    bar.addEventListener('mousemove', (e) => {
+      const tip = document.getElementById('planBarTip');
+      if (tip && tip.style.display !== 'none') {
+        tip.style.left = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8) + 'px';
+        tip.style.top = (e.clientY - 32) + 'px';
+      }
+    });
+    bar.addEventListener('mouseleave', () => {
+      const tip = document.getElementById('planBarTip');
+      if (tip) tip.style.display = 'none';
+    });
+
     // Drag to move — show guides at both edges
     bar.addEventListener('mousedown', (e) => {
       if (e.target.classList.contains('plan-resize') || e.target.classList.contains('plan-remove')) return;
+      const tip = document.getElementById('planBarTip');
+      if (tip) tip.style.display = 'none';
       e.preventDefault();
       const startX = e.clientX;
       const origStart = item.startOffset;
