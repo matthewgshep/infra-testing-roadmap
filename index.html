@@ -216,7 +216,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 12, 2026 at 11:28 AM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 12, 2026 at 11:40 AM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -322,7 +322,7 @@ QUARTERS.forEach(q => {
     WEEKS.push({ start: ws, end: we, num: w + 1, fq: q.label });
   }
 });
-const fqSet = [...new Set(TESTS.map(t => t.fq))].reverse();
+const fqSet = [...QUARTERS].reverse().map(q => q.label);
 const productSet = [...new Set(TESTS.map(t => t.product))];
 const prodSel = document.getElementById('productFilter');
 productSet.forEach(p => { const o = document.createElement('option'); o.value = p; o.text = p; prodSel.add(o); });
