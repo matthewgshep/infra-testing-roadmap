@@ -216,7 +216,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 12, 2026 at 11:40 AM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 12, 2026 at 11:46 AM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -1783,7 +1783,7 @@ function renderPlan() {
     // Guide line + date label helpers
     const daySnap = 1 / 7;
     const lanesContainer = timeline.querySelector('div[style*="position:relative"]') || timeline;
-    function showGuide(offsetWeeks, edge) {
+    function showGuide(offsetWeeks, edge, durationDays) {
       let guide = document.getElementById('planGuide');
       let label = document.getElementById('planGuideLabel');
       if (!guide) {
@@ -1803,7 +1803,9 @@ function renderPlan() {
       guide.style.display = 'block';
       const d = offsetToDate(offsetWeeks);
       const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-      label.textContent = dayName + ' ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      let labelText = dayName + ' ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      if (durationDays !== undefined) labelText += ' · ' + durationDays + ' day' + (durationDays !== 1 ? 's' : '');
+      label.textContent = labelText;
       label.style.left = px + 'px';
       label.style.display = 'block';
     }
@@ -1837,9 +1839,9 @@ function renderPlan() {
           }
           bar.style.left = (labelW + item.startOffset * PLAN_CELL) + 'px';
           bar.style.width = (item.duration * PLAN_CELL) + 'px';
-          // Show guide at the edge being dragged
+          // Show guide at the edge being dragged with duration
           const edgeOff = edge === 'right' ? item.startOffset + item.duration : item.startOffset;
-          showGuide(edgeOff, edge);
+          showGuide(edgeOff, edge, Math.round(item.duration * 7));
         }
         function onUp() {
           document.removeEventListener('mousemove', onMove);
