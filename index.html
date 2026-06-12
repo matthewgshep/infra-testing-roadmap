@@ -216,7 +216,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 12, 2026 at 11:46 AM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 12, 2026 at 11:49 AM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -1643,7 +1643,7 @@ function renderPlan() {
     const barWidth = p.duration * PLAN_CELL;
     lanesHtml += `<div class="plan-lane" style="height:${PLAN_ROW_H}px;min-width:${labelW + totalW}px;" data-plan-idx="${pi}">
       <div class="plan-lane-label" style="width:${labelW}px;">${esc(p.name.substring(0, 28))}</div>
-      <div class="plan-bar planned" style="left:${barLeft}px;width:${barWidth}px;" data-plan-idx="${pi}">
+      <div class="plan-bar planned" style="left:${barLeft}px;width:${barWidth}px;" data-plan-idx="${pi}" title="${escAttr(p.name)}">
         <div class="plan-resize left" data-plan-idx="${pi}" data-edge="left"></div>
         ${esc(p.name.substring(0, 20))}
         <div class="plan-resize right" data-plan-idx="${pi}" data-edge="right"></div>
