@@ -52,6 +52,10 @@
   .status-running { color: var(--gold-dark); background: var(--gold-bg); font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; white-space: nowrap; }
   .status-scheduled { color: #6b21a8; background: #f3e8ff; font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; white-space: nowrap; }
   .status-complete { color: #374151; background: #e5e7eb; font-weight: 600; border-radius: 3px; padding: 1px 6px; font-size: 10px; white-space: nowrap; }
+  .list-copy-btn { padding: 2px 8px; font-size: 10px; font-weight: 600; border-radius: 4px; border: 1px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.18); color: white; cursor: pointer; white-space: nowrap; }
+  .list-copy-btn:hover { background: rgba(255,255,255,0.30); }
+  .exp-table th.col-check { width: 1%; white-space: nowrap; cursor: default; }
+  .exp-table th.col-check:hover { background: var(--blue-dark); }
   .right-panel { flex: 1; overflow-x: auto; overflow-y: auto; height: 100%; }
   .right-panel::-webkit-scrollbar { height: 10px; }
   .right-panel::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 5px; }
@@ -212,7 +216,7 @@
 </head>
 <body>
 <div class="header">
-  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 12, 2026 at 11:22 AM</div></div>
+  <div><h1>Product Testing Roadmap</h1><div class="generated">Generated Jun 12, 2026 at 11:28 AM</div></div>
   <div class="controls">
     <label>Quarter</label>
     <div class="multi-select" id="fqFilter">
@@ -945,6 +949,9 @@ document.querySelectorAll('.view-tab').forEach(tab => {
 // ── Experiment List Table ──
 let listSortCol = 'start';
 let listSortDir = -1; // -1 = descending (newest first)
+let listSelected = new Set(); // persists selections across re-renders (keyed by test name)
+let listLastSorted = [];      // last rendered row order — used by copy
+function escAttr(s) { return s ? s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
 function renderList() {
   const container = document.getElementById('listContainer');
   // Apply product, status, search filters — intentionally ignore quarter filter
@@ -980,6 +987,7 @@ function renderList() {
     if (va > vb) return 1 * listSortDir;
     return 0;
   });
+  listLastSorted = sorted;
   const cols = [
     { key: 'product', label: 'Product', cls: '' },
     { key: 'name', label: 'Test Name', cls: 'col-name' },
@@ -996,7 +1004,15 @@ function renderList() {
     { key: 'details', label: 'Details', cls: 'col-detail' },
     { key: 'pm_commentary', label: 'PM Commentary', cls: 'col-detail' }
   ];
-  let html = '<table class="exp-table"><thead><tr>';
+  const allChecked = sorted.length > 0 && sorted.every(t => listSelected.has(t.name));
+  const someChecked = sorted.some(t => listSelected.has(t.name));
+  let html = `<table class="exp-table"><thead><tr>
+    <th class="col-check">
+      <div style="display:flex;align-items:center;gap:5px;">
+        <input type="checkbox" id="listSelectAll" ${allChecked ? 'checked' : ''} title="Select all">
+        <button class="list-copy-btn" id="listCopyBtn">Copy</button>
+      </div>
+    </th>`;
   cols.forEach(c => {
     const isSorted = listSortCol === c.key;
     const arrow = isSorted ? (listSortDir === 1 ? '\u25B2' : '\u25BC') : '\u25B2';
@@ -1004,9 +1020,10 @@ function renderList() {
   });
   html += '</tr></thead><tbody>';
   if (sorted.length === 0) {
-    html += `<tr><td colspan="${cols.length}" style="text-align:center;padding:24px;color:var(--text-muted);">No experiments match the current filters</td></tr>`;
+    html += `<tr><td colspan="${cols.length + 1}" style="text-align:center;padding:24px;color:var(--text-muted);">No experiments match the current filters</td></tr>`;
   }
   sorted.forEach(t => {
+    const checked = listSelected.has(t.name);
     const winCls = t.winner && t.winner.startsWith('Challenger') ? 'winner-challenger' : t.winner === 'Control' ? 'winner-control' : t.winner === 'Rollout' ? 'winner-rollout' : (t.status === 'Running' ? 'status-running' : (t.status === 'Scheduled' ? 'status-scheduled' : ''));
     const winHtml = t.winner ? `<span class="${winCls}">${t.winner}</span>` : (t.status === 'Running' ? '<span class="status-running">Running</span>' : (t.status === 'Scheduled' ? '<span class="status-scheduled">Scheduled</span>' : '\u2014'));
     const statusHtml = t.status === 'Running' ? '<span class="status-running">Running</span>' : (t.status === 'Scheduled' ? '<span class="status-scheduled">Scheduled</span>' : '<span class="status-complete">Complete</span>');
@@ -1015,6 +1032,7 @@ function renderList() {
     const detailHtml = t.details ? `<div class="col-detail-text">${esc(t.details)}</div>` : '\u2014';
     const pmHtml = t.pm_commentary ? `<div class="col-detail-text">${esc(t.pm_commentary)}</div>` : '\u2014';
     html += `<tr>
+      <td style="padding:4px 8px;"><input type="checkbox" class="list-row-cb" data-name="${escAttr(t.name)}" ${checked ? 'checked' : ''}></td>
       <td>${esc(t.product)}</td>
       <td class="col-name">${esc(t.name)}</td>
       <td>${t.fq}</td>
@@ -1033,8 +1051,11 @@ function renderList() {
   });
   html += '</tbody></table>';
   container.innerHTML = html;
-  // Wire up sortable headers
-  container.querySelectorAll('.exp-table th').forEach(th => {
+  // Set indeterminate on select-all if partial selection
+  const selectAllEl = container.querySelector('#listSelectAll');
+  if (selectAllEl) selectAllEl.indeterminate = !allChecked && someChecked;
+  // Wire up sortable headers (skip col-check header)
+  container.querySelectorAll('.exp-table th[data-col]').forEach(th => {
     th.addEventListener('click', () => {
       const col = th.dataset.col;
       if (listSortCol === col) {
@@ -1046,10 +1067,57 @@ function renderList() {
       renderList();
     });
   });
+  // Select-all checkbox
+  if (selectAllEl) {
+    selectAllEl.addEventListener('change', function(e) {
+      e.stopPropagation();
+      container.querySelectorAll('.list-row-cb').forEach(cb => {
+        cb.checked = this.checked;
+        if (this.checked) listSelected.add(cb.dataset.name); else listSelected.delete(cb.dataset.name);
+      });
+    });
+  }
+  // Individual row checkboxes
+  container.querySelectorAll('.list-row-cb').forEach(cb => {
+    cb.addEventListener('change', function() {
+      if (this.checked) listSelected.add(this.dataset.name); else listSelected.delete(this.dataset.name);
+      const all = container.querySelectorAll('.list-row-cb');
+      const nChecked = container.querySelectorAll('.list-row-cb:checked').length;
+      if (selectAllEl) {
+        selectAllEl.checked = nChecked === all.length;
+        selectAllEl.indeterminate = nChecked > 0 && nChecked < all.length;
+      }
+    });
+  });
+  // Copy button
+  const copyBtn = container.querySelector('#listCopyBtn');
+  if (copyBtn) copyBtn.addEventListener('click', (e) => { e.stopPropagation(); copySelectedRows(); });
   // Click detail text to expand/collapse
   container.querySelectorAll('.col-detail-text').forEach(el => {
     el.style.cursor = 'pointer';
     el.addEventListener('click', () => el.classList.toggle('expanded'));
+  });
+}
+function copySelectedRows() {
+  const target = listSelected.size > 0
+    ? listLastSorted.filter(t => listSelected.has(t.name))
+    : listLastSorted;
+  if (target.length === 0) return;
+  const headers = ['Product','Test Name','Quarter','Start','End','Status','Winner','QGNARR','GNARR Lift','CTR','Units %','GDS','Details','PM Commentary'];
+  const rows = target.map(t => [
+    t.product, t.name, t.fq, t.start,
+    (t.status === 'Running' || t.status === 'Scheduled') ? '' : t.end,
+    t.status, t.winner || '',
+    t.qgnarr !== null ? t.qgnarr : '',
+    t.gnarr !== null ? ((t.gnarr >= 0 ? '+' : '') + (t.gnarr * 100).toFixed(2) + '%') : '',
+    t.ctr !== null ? ((t.ctr >= 0 ? '+' : '') + (t.ctr * 100).toFixed(2) + '%') : '',
+    t.units_pct !== null ? ((t.units_pct >= 0 ? '+' : '') + (t.units_pct * 100).toFixed(2) + '%') : '',
+    t.gds_text || '', t.details || '', t.pm_commentary || ''
+  ].join('\t'));
+  const tsv = [headers.join('\t'), ...rows].join('\n');
+  navigator.clipboard.writeText(tsv).then(() => {
+    const btn = document.getElementById('listCopyBtn');
+    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); }
   });
 }
 // ── Scatter Chart ──
