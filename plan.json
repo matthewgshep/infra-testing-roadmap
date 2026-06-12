@@ -1,0 +1,34 @@
+[
+  {
+    "name": "RGS0448 - Edit Nudge DMB - Reader - Multi - WW - EN",
+    "product": "Acrobat Reader",
+    "startDate": "2026-06-18",
+    "endDate": "2026-07-30",
+    "durationWeeks": 6,
+    "fqWeek": "FY26 Q3 W3"
+  },
+  {
+    "name": "RGS0496 - Export Micro-Trial for Low Prop Users - Reader - Multi - WW - EN, DE, JP, FR, ES, PT, KR",
+    "product": "Acrobat Reader",
+    "startDate": "2026-06-18",
+    "endDate": "2026-07-30",
+    "durationWeeks": 6,
+    "fqWeek": "FY26 Q3 W3"
+  },
+  {
+    "name": "RGS0495 - Nudge to Try Edit tools on Sample PDF - Reader - Multi - WW - EN, DE, JP, FR, ES, PT, KR",
+    "product": "Acrobat Reader",
+    "startDate": "2026-06-18",
+    "endDate": "2026-07-30",
+    "durationWeeks": 6,
+    "fqWeek": "FY26 Q3 W3"
+  },
+  {
+    "name": "RGS0506 - DNH Placeholder - Reader - Multi - WW - EN",
+    "product": "Acrobat Reader",
+    "startDate": "2026-06-18",
+    "endDate": "2026-07-30",
+    "durationWeeks": 6,
+    "fqWeek": "FY26 Q3 W3"
+  }
+]
